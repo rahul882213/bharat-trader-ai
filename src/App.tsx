@@ -24,8 +24,13 @@ import { NewsSection } from './components/NewsSection';
 import { BacktestSection } from './components/BacktestSection';
 import { PortfolioRiskSection } from './components/PortfolioRiskSection';
 import { AlertsSettingsSection } from './components/AlertsSettingsSection';
-import { formatINR } from './utils/formatters';
-import { getBackendBaseUrl, getIsStaticMode, setBackendBaseUrl } from './utils/apiBridge';
+import { formatINR, formatISTTime } from './utils/formatters';
+import {
+  BackendHealthStatus,
+  checkBackendHealth,
+  getBackendBaseUrl,
+  setBackendBaseUrl,
+} from './utils/apiBridge';
 
 const NAV_ITEMS: { id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Market Overview', icon: Activity },
@@ -59,17 +64,22 @@ export default function App() {
   const [workflowData, setWorkflowData] = useState<any>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
 
-  // Static GitHub Pages mode notice + optional backend URL connector
-  const [staticMode, setStaticMode] = useState<boolean>(() => getIsStaticMode());
-  const [backendUrlInput, setBackendUrlInput] = useState<string>(() => getBackendBaseUrl() || 'http://localhost:3000');
+  // Backend Connectivity & Cloud Health State (Requirement #8)
+  const [health, setHealth] = useState<BackendHealthStatus>({
+    checked: false,
+    connected: false,
+    backendUrl: getBackendBaseUrl(),
+  });
+  const [backendUrlInput, setBackendUrlInput] = useState<string>(() => getBackendBaseUrl());
+  const [showUrlEditor, setShowUrlEditor] = useState(false);
+
+  const refreshHealth = async () => {
+    const status = await checkBackendHealth();
+    setHealth(status);
+  };
 
   useEffect(() => {
-    const handler = (ev: Event) => {
-      const detail = (ev as CustomEvent<boolean>).detail;
-      setStaticMode(Boolean(detail));
-    };
-    window.addEventListener('bharat-trader-static-mode', handler);
-    return () => window.removeEventListener('bharat-trader-static-mode', handler);
+    refreshHealth();
   }, []);
 
   // Sync canonical metadata whenever selectedSymbol changes
@@ -246,35 +256,129 @@ export default function App() {
         </div>
       </header>
 
-      {staticMode && (
-        <div className="px-4 md:px-5 py-2 bg-[#11192b] border-b border-amber-500/30 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="text-slate-300">
-            <span className="font-semibold text-amber-300">Static GitHub Pages Mode:</span> Universal Stock Search across 2,636+ NSE/BSE equities is active. Connect a running Bharat Trader AI backend (<code className="font-mono text-slate-200">npm run dev</code>) for live Yahoo/NSE feeds, Screener DB persistence &amp; 12-Step AI Analysis.
+      {/* Automated Backend Connectivity, Database & Provider Status Bar */}
+      <div
+        className={`px-4 md:px-5 py-2 border-b text-[11px] flex flex-wrap items-center justify-between gap-3 ${
+          !health.checked
+            ? 'bg-[#0d1424] border-slate-800 text-slate-400'
+            : health.connected
+              ? 'bg-[#0b1523] border-slate-800/90 text-slate-300'
+              : 'bg-[#1a1118] border-rose-500/40 text-rose-200'
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="inline-flex items-center gap-1.5 font-semibold">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                !health.checked
+                  ? 'bg-slate-500 animate-pulse'
+                  : health.connected
+                    ? 'bg-emerald-400'
+                    : 'bg-rose-500'
+              }`}
+            />
+            <span>
+              Backend:{' '}
+              {!health.checked ? 'Checking...' : health.connected ? 'Connected' : 'Disconnected'}
+            </span>
           </div>
+
+          <span className="font-mono text-slate-400">
+            URL:{' '}
+            <span className="text-slate-200">
+              {health.backendUrl || 'Not configured (VITE_API_BASE_URL)'}
+            </span>
+          </span>
+
+          <span className="text-slate-400">
+            DB:{' '}
+            <span className={health.database?.connected ? 'text-emerald-300' : 'text-rose-300'}>
+              {health.database?.connected
+                ? `Connected (${health.database.dialect || 'sql'})`
+                : 'Disconnected'}
+            </span>
+          </span>
+
+          {health.dataProviders && Object.keys(health.dataProviders).length > 0 && (
+            <span className="text-slate-400">
+              Providers:{' '}
+              <span className="text-slate-200">
+                {Object.entries(health.dataProviders)
+                  .map(([k, v]) => `${k.replace('_', ' ')}: ${v.available ? 'OK' : 'Off'}`)
+                  .join(' · ')}
+              </span>
+            </span>
+          )}
+
+          <span className="text-slate-400 font-mono">
+            Last Update:{' '}
+            <span className="text-slate-200">
+              {health.lastUpdated ? formatISTTime(health.lastUpdated) : 'Unavailable'}
+            </span>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!health.connected && health.checked && health.error && (
+            <span className="text-rose-300 max-w-md truncate" title={health.error}>
+              {health.error}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowUrlEditor((v) => !v)}
+            className="px-2.5 py-1 bg-slate-800/80 border border-slate-700 rounded text-[11px] text-slate-200 hover:bg-slate-700"
+          >
+            {showUrlEditor ? 'Hide API Config' : 'Configure HTTPS API'}
+          </button>
+          <button
+            type="button"
+            onClick={refreshHealth}
+            className="px-2.5 py-1 bg-slate-800/80 border border-slate-700 rounded text-[11px] text-slate-200 hover:bg-slate-700"
+          >
+            Recheck
+          </button>
+        </div>
+
+        {showUrlEditor && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
               setBackendBaseUrl(backendUrlInput);
               window.location.reload();
             }}
-            className="flex items-center gap-2"
+            className="w-full pt-1.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2"
           >
+            <span className="text-slate-400">Deployed HTTPS Backend URL:</span>
             <input
               type="url"
               value={backendUrlInput}
               onChange={(e) => setBackendUrlInput(e.target.value)}
-              placeholder="http://localhost:3000"
-              className="w-52 bg-[#090d16] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-400"
+              placeholder="https://your-service.onrender.com"
+              className="flex-1 min-w-[240px] max-w-md bg-[#090d16] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-400"
             />
             <button
               type="submit"
               className="px-3 py-1 bg-amber-400 text-slate-950 font-semibold rounded hover:bg-amber-300"
             >
-              Connect Backend
+              Connect HTTPS Backend
             </button>
+            {getBackendBaseUrl() && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBackendUrlInput('');
+                  setBackendBaseUrl('');
+                  window.location.reload();
+                }}
+                className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
+              >
+                Reset
+              </button>
+            )}
           </form>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="flex flex-1 min-h-0">
         {/* Left Institutional Sidebar */}

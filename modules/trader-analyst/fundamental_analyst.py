@@ -779,10 +779,19 @@ def analyze_fundamentals(symbol: str, exchange: str = "NSE", include_peers: bool
         sc = ai_eval["scores"]
         execute_sql(
             """
-            INSERT OR REPLACE INTO ai_fundamental_analyses
+            INSERT INTO ai_fundamental_analyses
             (stock_id, symbol, business_quality_score, financial_strength_score, growth_score,
              valuation_score, overall_assessment, analysis_json, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(stock_id) DO UPDATE SET
+                symbol = excluded.symbol,
+                business_quality_score = excluded.business_quality_score,
+                financial_strength_score = excluded.financial_strength_score,
+                growth_score = excluded.growth_score,
+                valuation_score = excluded.valuation_score,
+                overall_assessment = excluded.overall_assessment,
+                analysis_json = excluded.analysis_json,
+                updated_at = excluded.updated_at
             """,
             (
                 stock_meta["stock_id"],

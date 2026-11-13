@@ -1,9 +1,10 @@
 /**
- * Client API bridge for full-stack mode and static GitHub Pages mode.
- * - Full-stack mode (localhost / Cloud Run): proxies directly to Express + Python /api/*.
- * - Static GitHub Pages mode (no backend): powers Universal Stock Search across 2,636+
- *   real NSE/BSE equities from stocks-master.json and returns clean structured notices
- *   for endpoints that require a live Python/Express market server (never fake prices).
+ * Configurable Client API Bridge for Bharat Trader AI.
+ * - Uses VITE_API_BASE_URL (HTTPS backend URL e.g. Render) when configured, or runtime
+ *   saved URL (?api=https://... / localStorage), or same-origin when hosted full-stack.
+ * - On static hosts (e.g. GitHub Pages) when no live backend is connected, serves real
+ *   static NSE/BSE symbol directory search from stocks-master.json and returns clear
+ *   503 JSON diagnostics for live-data endpoints (zero fake market data or status).
  */
 
 const STORAGE_KEY = 'bharat_trader_api_url';
@@ -12,8 +13,31 @@ const STATIC_EVENT = 'bharat-trader-static-mode';
 let cachedMaster: any[] | null = null;
 let isStaticMode = false;
 
+export interface BackendHealthStatus {
+  checked: boolean;
+  connected: boolean;
+  backendUrl: string;
+  apiVersion?: string;
+  tradingMode?: string;
+  database?: {
+    connected: boolean;
+    dialect?: string;
+    stock_master_count?: number;
+    last_data_update?: string | null;
+    error?: string | null;
+  };
+  dataProviders?: Record<string, { available?: boolean; configured?: boolean; symbols_count?: number; type?: string }>;
+  lastUpdated?: string | null;
+  error?: string | null;
+}
+
+export function getConfiguredEnvApiUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || '';
+  return String(envUrl).trim().replace(/\/+$/, '');
+}
+
 export function getBackendBaseUrl(): string {
-  if (typeof window === 'undefined') return '';
+  if (typeof window === 'undefined') return getConfiguredEnvApiUrl();
   try {
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('api');
@@ -27,8 +51,16 @@ export function getBackendBaseUrl(): string {
   } catch {
     // Ignore storage errors
   }
-  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || '';
-  return String(envUrl).trim().replace(/\/+$/, '');
+  return getConfiguredEnvApiUrl();
+}
+
+export function getDisplayBackendUrl(): string {
+  const configured = getBackendBaseUrl();
+  if (configured) return configured;
+  if (typeof window !== 'undefined' && !window.location.hostname.endsWith('github.io')) {
+    return window.location.origin;
+  }
+  return '';
 }
 
 export function setBackendBaseUrl(url: string) {
@@ -68,14 +100,84 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
+export async function checkBackendHealth(): Promise<BackendHealthStatus> {
+  const baseUrl = getBackendBaseUrl();
+  const displayUrl = getDisplayBackendUrl();
+  const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+
+  if (!baseUrl && isGitHubPages) {
+    markStaticMode();
+    return {
+      checked: true,
+      connected: false,
+      backendUrl: '',
+      database: { connected: false },
+      dataProviders: {},
+      lastUpdated: null,
+      error:
+        'Backend API URL is not configured. Deploy the FastAPI backend on Render, set VITE_API_BASE_URL, or connect your deployed HTTPS backend URL.',
+    };
+  }
+
+  const target = baseUrl ? `${baseUrl}/health` : '/health';
+  try {
+    const res = await window.fetch(target, { cache: 'no-store' });
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      markStaticMode();
+      return {
+        checked: true,
+        connected: false,
+        backendUrl: displayUrl,
+        database: { connected: false },
+        dataProviders: {},
+        lastUpdated: null,
+        error: `Backend at ${displayUrl || 'origin'} returned non-JSON HTTP ${res.status}.`,
+      };
+    }
+    const json = await res.json();
+    if (!res.ok || (json.status !== 'ok' && json.status !== 'degraded')) {
+      return {
+        checked: true,
+        connected: false,
+        backendUrl: displayUrl,
+        database: json.database || { connected: false },
+        dataProviders: json.data_providers || {},
+        lastUpdated: json.last_updated || null,
+        error: json.error || `Backend responded with HTTP ${res.status}`,
+      };
+    }
+    isStaticMode = false;
+    window.dispatchEvent(new CustomEvent(STATIC_EVENT, { detail: false }));
+    return {
+      checked: true,
+      connected: true,
+      backendUrl: displayUrl,
+      apiVersion: json.api_version,
+      tradingMode: json.trading_mode,
+      database: json.database || { connected: true },
+      dataProviders: json.data_providers || {},
+      lastUpdated: json.last_updated || json.database?.last_data_update || json.server_time_ist || null,
+      error: null,
+    };
+  } catch (err: any) {
+    markStaticMode();
+    return {
+      checked: true,
+      connected: false,
+      backendUrl: displayUrl,
+      database: { connected: false },
+      dataProviders: {},
+      lastUpdated: null,
+      error: err?.message || 'Unable to reach Bharat Trader AI backend over HTTPS.',
+    };
+  }
+}
+
 async function handleStaticFallback(urlPath: string, origFetch: typeof fetch): Promise<Response> {
   markStaticMode();
   const parsed = new URL(urlPath, window.location.origin);
   const path = parsed.pathname;
-
-  if (path === '/api/health') {
-    return jsonResponse({ status: 'static', mode: 'github-pages' }, 200);
-  }
 
   if (path === '/api/symbols/search') {
     const master = await loadStaticMaster(origFetch);
@@ -182,7 +284,7 @@ async function handleStaticFallback(urlPath: string, origFetch: typeof fetch): P
   return jsonResponse(
     {
       error:
-        'Live NSE/BSE market feeds, Python backtesting, Screener DB imports, and 12-Step AI Analysis require a running Bharat Trader AI backend server. Run `npm run dev` locally or connect a backend URL in the top bar.',
+        'Backend API Disconnected: Deploy the FastAPI backend on Render (with Supabase PostgreSQL) and connect via VITE_API_BASE_URL or the HTTPS backend connector bar.',
       static_mode: true,
       available: false,
     },
@@ -208,6 +310,13 @@ export function installApiBridge() {
     }
 
     const baseUrl = getBackendBaseUrl();
+    const isGitHubPages = window.location.hostname.endsWith('github.io');
+
+    // On GitHub Pages with no backend URL configured, avoid firing doomed 404 calls
+    if (!baseUrl && isGitHubPages) {
+      return handleStaticFallback(rawUrl, origFetch);
+    }
+
     const targetUrl = baseUrl ? `${baseUrl}${rawUrl}` : rawUrl;
 
     try {

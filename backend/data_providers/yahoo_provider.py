@@ -195,9 +195,17 @@ class YahooUnofficialProvider(MarketDataProvider):
                 try:
                     execute_sql(
                         """
-                        INSERT OR REPLACE INTO market_price_cache
+                        INSERT INTO market_price_cache
                         (stock_id, symbol, last_price, change_pct, volume, source, last_bar_ist, fetched_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(stock_id) DO UPDATE SET
+                            symbol = excluded.symbol,
+                            last_price = excluded.last_price,
+                            change_pct = excluded.change_pct,
+                            volume = excluded.volume,
+                            source = excluded.source,
+                            last_bar_ist = excluded.last_bar_ist,
+                            fetched_at = excluded.fetched_at
                         """,
                         (
                             stock_rec["stock_id"],

@@ -339,7 +339,7 @@ def run_backtest(
             "symbol": normalize_symbol(symbol),
             "error": data.get("error", "Historical data unavailable."),
         }
-    return run_backtest_on_candles(
+    res = run_backtest_on_candles(
         symbol=symbol,
         candles=data["candles"],
         strategy=strategy,
@@ -351,3 +351,39 @@ def run_backtest(
         monte_carlo_runs=monte_carlo_runs,
         source=data.get("source", "Yahoo Finance (Unofficial)"),
     )
+    if res.get("available"):
+        try:
+            import json as _json
+            import uuid as _uuid
+            from backend.database.db import execute_sql
+
+            m = res.get("metrics", {})
+            bt_id = f"BT-{_uuid.uuid4().hex[:10].upper()}"
+            execute_sql(
+                """
+                INSERT INTO backtest_results
+                (backtest_id, stock_id, symbol, strategy, timeframe, trade_type,
+                 initial_capital, final_capital, net_pnl, win_rate_pct, sharpe_ratio,
+                 max_drawdown_pct, result_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    bt_id,
+                    (data.get("stock_meta") or {}).get("stock_id"),
+                    res["symbol"],
+                    strategy,
+                    timeframe,
+                    trade_type,
+                    res["initial_capital"],
+                    res["final_capital"],
+                    res["net_pnl"],
+                    m.get("win_rate_pct", 0.0),
+                    m.get("sharpe_ratio", 0.0),
+                    m.get("max_drawdown_pct", 0.0),
+                    _json.dumps(res),
+                    res["generated_at_ist"],
+                ),
+            )
+        except Exception:
+            pass
+    return res

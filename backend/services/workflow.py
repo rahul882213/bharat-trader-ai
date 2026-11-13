@@ -252,13 +252,21 @@ def run_analysis(
         "portfolio": portfolio_snapshot["portfolio"],
     }
 
-    # Persist into central ai_trading_analyses table
+    # Persist into central ai_trading_analyses and technical_signals tables
     try:
+        now_iso = datetime.now(tz=IST).isoformat()
         execute_sql(
             """
-            INSERT OR REPLACE INTO ai_trading_analyses
+            INSERT INTO ai_trading_analyses
             (stock_id, symbol, analysis_type, entry_status, risk_verdict, workflow_json, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(stock_id) DO UPDATE SET
+                symbol = excluded.symbol,
+                analysis_type = excluded.analysis_type,
+                entry_status = excluded.entry_status,
+                risk_verdict = excluded.risk_verdict,
+                workflow_json = excluded.workflow_json,
+                updated_at = excluded.updated_at
             """,
             (
                 stock_meta["stock_id"],
@@ -267,7 +275,34 @@ def run_analysis(
                 entry_res.get("status", "UNKNOWN"),
                 risk_res.get("verdict", "UNKNOWN"),
                 json.dumps(result_payload),
-                datetime.now(tz=IST).isoformat(),
+                now_iso,
+            ),
+        )
+        sig_id = f"SIG-{stock_meta['stock_id']}-{timeframe}-{strategy}"
+        execute_sql(
+            """
+            INSERT INTO technical_signals
+            (signal_id, stock_id, symbol, exchange, timeframe, strategy, signal_direction, score, price, reasons_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(signal_id) DO UPDATE SET
+                signal_direction = excluded.signal_direction,
+                score = excluded.score,
+                price = excluded.price,
+                reasons_json = excluded.reasons_json,
+                created_at = excluded.created_at
+            """,
+            (
+                sig_id,
+                stock_meta["stock_id"],
+                clean,
+                resolved_exchange,
+                timeframe,
+                strategy,
+                entry_res.get("status", "WATCH"),
+                float(indicators.get("rsi14") or 0.0),
+                float(latest_price or 0.0),
+                json.dumps(entry_res.get("reasons", [])),
+                now_iso,
             ),
         )
     except Exception:
