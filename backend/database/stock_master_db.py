@@ -269,33 +269,116 @@ def upsert_stock_record(record: Dict[str, Any]) -> str:
     return stock_id
 
 
-def _discover_via_yahoo(query: str) -> Optional[Dict[str, Any]]:
-    """Fallback discovery for unlisted/BSE/SME symbols via Yahoo Search (labeled unofficial)."""
+def _discover_via_screener(query: str) -> List[Dict[str, Any]]:
+    """Fallback discovery using Screener.in public autocomplete for BSE scrip codes & BSE/NSE stocks."""
+    out: List[Dict[str, Any]] = []
+    q_clean = (query or "").strip()
+    if len(q_clean) < 2:
+        return out
     try:
-        u = f"https://query1.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(query)}&quotesCount=6&newsCount=0"
+        u = f"https://www.screener.in/api/company/search/?q={urllib.parse.quote(q_clean)}"
         req = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
-        data = json.loads(urllib.request.urlopen(req, timeout=6).read().decode("utf-8"))
-        for q in data.get("quotes", []):
-            exch = q.get("exchange")
-            ysym = q.get("symbol", "")
-            if exch in {"NSI", "BSE", "BOM"} and (ysym.endswith(".NS") or ysym.endswith(".BO")):
-                base = ysym.rsplit(".", 1)[0].replace("-SM", "")
-                is_bse = ysym.endswith(".BO")
-                record = {
-                    "nse_symbol": None if is_bse else base,
-                    "bse_code": base if is_bse and base.isdigit() else "",
-                    "yahoo_symbol": ysym,
-                    "company_name": q.get("longname") or q.get("shortname") or base,
-                    "sector": q.get("sectorDisp") or "Indian Equities",
-                    "industry": q.get("industryDisp") or "Indian Listed Equity",
-                    "exchange": "BSE" if is_bse else ("NSE-SME" if "-SM.NS" in ysym else "NSE"),
-                }
-                sid = upsert_stock_record(record)
+        items = json.loads(urllib.request.urlopen(req, timeout=6).read().decode("utf-8"))
+        if not isinstance(items, list):
+            return out
+        is_bse_code_query = q_clean.isdigit() and 5 <= len(q_clean) <= 6
+        for item in items[:5]:
+            comp_url = str(item.get("url") or "")
+            name = str(item.get("name") or "").strip()
+            parts = [p for p in comp_url.strip("/").split("/") if p]
+            # Format: /company/<SLUG>/...
+            if len(parts) >= 2 and parts[0] == "company":
+                slug = parts[1].upper()
+                if slug.isdigit():
+                    rec_in = {
+                        "nse_symbol": None,
+                        "bse_code": slug,
+                        "yahoo_symbol": f"{slug}.BO",
+                        "company_name": name or slug,
+                        "exchange": "BSE",
+                        "screener_url": f"https://www.screener.in{comp_url}",
+                    }
+                else:
+                    rec_in = {
+                        "nse_symbol": slug,
+                        "bse_code": q_clean if is_bse_code_query else "",
+                        "yahoo_symbol": f"{slug}.NS",
+                        "company_name": name or slug,
+                        "exchange": "BSE" if is_bse_code_query else "NSE",
+                        "screener_url": f"https://www.screener.in{comp_url}",
+                    }
+                sid = upsert_stock_record(rec_in)
                 rows = query_all("SELECT * FROM stocks_master WHERE stock_id = ?", (sid,))
-                return rows[0] if rows else None
+                if rows:
+                    row_dict = dict(rows[0])
+                    if is_bse_code_query:
+                        row_dict["exchange"] = "BSE"
+                    out.append(row_dict)
     except Exception:
         pass
-    return None
+    return out
+
+
+def _discover_many_via_yahoo(query: str, limit: int = 8) -> List[Dict[str, Any]]:
+    """Fallback discovery for unlisted/BSE/SME symbols via Yahoo & Screener Search (labeled unofficial)."""
+    discovered: List[Dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    q_clean = (query or "").strip()
+    if not q_clean:
+        return discovered
+
+    # If user typed a 5-6 digit BSE scrip code, Screener search maps it accurately to its company & ticker
+    if q_clean.isdigit() and 5 <= len(q_clean) <= 6:
+        screener_hits = _discover_via_screener(q_clean)
+        if screener_hits:
+            return screener_hits[:limit]
+
+    search_terms = [q_clean]
+    if q_clean.isdigit() and len(q_clean) >= 5:
+        search_terms.insert(0, f"{q_clean}.BO")
+
+    for term in search_terms:
+        try:
+            u = f"https://query1.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(term)}&quotesCount=10&newsCount=0"
+            req = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
+            data = json.loads(urllib.request.urlopen(req, timeout=6).read().decode("utf-8"))
+            for q in data.get("quotes", []):
+                exch = q.get("exchange")
+                ysym = q.get("symbol", "")
+                if exch in {"NSI", "BSE", "BOM"} and (ysym.endswith(".NS") or ysym.endswith(".BO")):
+                    base = ysym.rsplit(".", 1)[0].replace("-SM", "")
+                    is_bse = ysym.endswith(".BO")
+                    bse_code_val = q_clean if (q_clean.isdigit() and is_bse) else (base if is_bse and base.isdigit() else "")
+                    record = {
+                        "nse_symbol": None if is_bse else base,
+                        "bse_code": bse_code_val,
+                        "yahoo_symbol": ysym,
+                        "company_name": q.get("longname") or q.get("shortname") or base,
+                        "sector": q.get("sectorDisp") or "Indian Equities",
+                        "industry": q.get("industryDisp") or "Indian Listed Equity",
+                        "exchange": "BSE" if is_bse else ("NSE-SME" if "-SM.NS" in ysym else "NSE"),
+                    }
+                    sid = upsert_stock_record(record)
+                    if sid not in seen_ids:
+                        rows = query_all("SELECT * FROM stocks_master WHERE stock_id = ?", (sid,))
+                        if rows:
+                            discovered.append(rows[0])
+                            seen_ids.add(sid)
+                    if len(discovered) >= limit:
+                        return discovered
+        except Exception:
+            pass
+        if discovered:
+            break
+
+    if not discovered:
+        return _discover_via_screener(q_clean)[:limit]
+    return discovered
+
+
+def _discover_via_yahoo(query: str) -> Optional[Dict[str, Any]]:
+    matches = _discover_many_via_yahoo(query, limit=1)
+    return matches[0] if matches else None
 
 
 def resolve_stock(identifier: str, exchange: Optional[str] = None) -> Dict[str, Any]:
@@ -322,8 +405,15 @@ def resolve_stock(identifier: str, exchange: Optional[str] = None) -> Dict[str, 
     )
     if rows:
         rec = dict(rows[0])
-        if exchange and exchange.upper() == "BSE" and rec.get("bse_code"):
-            rec["effective_yahoo_symbol"] = f"{rec['bse_code']}.BO" if rec["bse_code"].isdigit() else f"{rec['nse_symbol']}.BO"
+        if (exchange and exchange.upper() == "BSE") or (raw.upper().endswith(".BO")) or (raw.isdigit() and rec.get("bse_code") == raw):
+            if rec.get("nse_symbol"):
+                rec["effective_yahoo_symbol"] = f"{rec['nse_symbol']}.BO"
+            elif rec.get("yahoo_symbol"):
+                rec["effective_yahoo_symbol"] = rec["yahoo_symbol"]
+            else:
+                rec["effective_yahoo_symbol"] = f"{rec.get('bse_code') or clean}.BO"
+            if exchange and exchange.upper() == "BSE":
+                rec["exchange"] = "BSE"
         else:
             rec["effective_yahoo_symbol"] = rec.get("yahoo_symbol") or f"{rec.get('nse_symbol') or clean}.NS"
         return rec
@@ -403,8 +493,11 @@ def search_stock_master(
         clauses.append("LOWER(cap_tier) = LOWER(?)")
         params.append(cap_tier)
     if exchange and exchange != "ALL":
-        clauses.append("UPPER(exchange) LIKE ?")
-        params.append(f"{exchange.upper()}%")
+        if exchange.upper() == "BSE":
+            clauses.append("(UPPER(exchange) LIKE 'BSE%' OR (bse_code IS NOT NULL AND bse_code != ''))")
+        else:
+            clauses.append("UPPER(exchange) LIKE ?")
+            params.append(f"{exchange.upper()}%")
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     qu_exact = normalize_symbol(q) if q else ""

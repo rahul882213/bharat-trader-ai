@@ -17,7 +17,7 @@ export const NewsSection: React.FC<Props> = ({ symbol }) => {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ limit: '35' });
-      if (scope === 'symbol') qs.set('symbol', symbol);
+      if (scope === 'symbol' && symbol) qs.set('symbol', symbol);
       if (refresh) qs.set('refresh', '1');
       const res = await apiFetch(`/api/news?${qs.toString()}`);
       setData(await res.json());
@@ -27,6 +27,7 @@ export const NewsSection: React.FC<Props> = ({ symbol }) => {
   };
 
   useEffect(() => {
+    if (!symbol && scope === 'symbol') setScope('market');
     loadNews(false);
   }, [scope, symbol]);
 
@@ -74,12 +75,13 @@ export const NewsSection: React.FC<Props> = ({ symbol }) => {
           </button>
           <button
             type="button"
+            disabled={!symbol}
             onClick={() => setScope('symbol')}
-            className={`px-3 py-1.5 text-xs font-medium rounded ${
+            className={`px-3 py-1.5 text-xs font-medium rounded disabled:opacity-40 ${
               scope === 'symbol' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            {symbol} Specific Filings & News
+            {symbol ? `${symbol} Specific Filings & News` : 'Select a Stock for Company News'}
           </button>
         </div>
 

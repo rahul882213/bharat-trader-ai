@@ -187,11 +187,19 @@ async function handleStaticFallback(urlPath: string): Promise<Response> {
   if (path === '/api/symbols/search') {
     const master = await loadStaticMaster();
     const q = (parsed.searchParams.get('q') || '').trim().toUpperCase();
+    const exFilter = (parsed.searchParams.get('exchange') || 'ALL').trim().toUpperCase();
     const limit = Math.min(Number(parsed.searchParams.get('limit') || 25), 100);
-    if (!q) return jsonResponse({ results: master.slice(0, limit) });
+    const pool =
+      exFilter === 'BSE'
+        ? master.filter((r) => String(r.exchange || '').toUpperCase().startsWith('BSE') || Boolean(r.bse_code))
+        : exFilter !== 'ALL'
+          ? master.filter((r) => String(r.exchange || 'NSE').toUpperCase().startsWith(exFilter))
+          : master;
+
+    if (!q) return jsonResponse({ results: pool.slice(0, limit) });
 
     const scored: { score: number; row: any }[] = [];
-    for (const row of master) {
+    for (const row of pool) {
       const sym = String(row.symbol || '').toUpperCase();
       const bse = String(row.bse_code || '').toUpperCase();
       const isin = String(row.isin || '').toUpperCase();
@@ -257,11 +265,14 @@ async function handleStaticFallback(urlPath: string): Promise<Response> {
     });
   }
 
+  if (path === '/api/watchlist') {
+    return jsonResponse({ watchlist: [], updated_at: null, static_mode: true });
+  }
+
   if (path === '/api/screener/template-csv') {
     return jsonResponse({
       csv:
-        'Name,NSE Code,BSE Code,Current Price,Market Capitalization,Stock P/E,ROE %,ROCE %,Debt to Equity,Sales growth 3Years,Profit growth 3Years,OPM %,Promoter holding %,Pledged percentage\n' +
-        'Reliance Industries Ltd,RELIANCE,500325,1349.4,1826000,25.4,9.8,11.2,0.42,8.5,7.2,15.8,50.1,0.0\n',
+        'Name,NSE Code,BSE Code,Current Price,Market Capitalization,Stock P/E,ROE %,ROCE %,Debt to Equity,Sales growth 3Years,Profit growth 3Years,OPM %,Promoter holding %,Pledged percentage\n',
       static_mode: true,
     });
   }

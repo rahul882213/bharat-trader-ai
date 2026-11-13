@@ -120,7 +120,7 @@ def main() -> int:
 
     # backtest --strategy <STRAT>
     p_bt = sub.add_parser("backtest", help="Run historical backtest + Monte Carlo simulations")
-    p_bt.add_argument("--symbol", default="RELIANCE")
+    p_bt.add_argument("--symbol", required=True)
     p_bt.add_argument("--strategy", default="orb")
     p_bt.add_argument("--timeframe", default="1d")
     p_bt.add_argument("--capital", type=float, default=1000000.0)

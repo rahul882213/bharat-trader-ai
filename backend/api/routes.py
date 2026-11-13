@@ -23,7 +23,7 @@ except ImportError:  # Allows Python CLI & stdlib tests without pip fastapi inst
     Query = lambda *a, **kw: None  # type: ignore
 
 from backend.database.db import check_db_health, execute_sql, query_all
-from backend.database.stock_master_db import resolve_stock, search_stock_master
+from backend.database.stock_master_db import _discover_many_via_yahoo, resolve_stock, search_stock_master
 from backend.data_providers.provider_manager import get_provider_manager
 from backend.services.indicators import compute_all_indicators
 from backend.services.workflow import load_module_fn, run_analysis
@@ -55,6 +55,14 @@ def _cache_clear() -> None:
 
 def build_root_health_payload() -> Dict[str, Any]:
     db_info = check_db_health()
+    if db_info.get("connected") and db_info.get("stock_master_count", 0) == 0:
+        try:
+            from backend.database.stock_master_db import sync_stock_master
+
+            sync_stock_master(force=False)
+            db_info = check_db_health()
+        except Exception:
+            pass
     gemini_ok = bool(os.getenv("GEMINI_API_KEY") and os.getenv("GEMINI_API_KEY") != "MY_GEMINI_API_KEY")
     trading_mode = os.getenv("TRADING_MODE", "paper").lower()
     return {
@@ -147,6 +155,7 @@ class WatchlistAddRequest(BaseModel):
 class WorkflowRunRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=40)
     exchange: Literal["NSE", "BSE"] = "NSE"
+    company_name: Optional[str] = Field(default=None, max_length=200)
     analysis_type: Literal["full", "technical", "fundamental", "swing", "intraday"] = "full"
     timeframe: Literal["1m", "5m", "15m", "30m", "1h", "1d"] = "1d"
     strategy: str = Field(default="ema_crossover", max_length=40)
@@ -187,7 +196,7 @@ class OptionalPublicFetchRequest(BaseModel):
 
 
 class BacktestRequest(BaseModel):
-    symbol: str = Field(default="RELIANCE", min_length=1, max_length=40)
+    symbol: str = Field(..., min_length=1, max_length=40)
     strategy: str = Field(default="ema_crossover", max_length=40)
     timeframe: Literal["5m", "15m", "30m", "1h", "1d"] = "1d"
     capital: float = Field(default=1000000.0, gt=1000, le=1_000_000_000)
@@ -312,28 +321,37 @@ def build_router():
             limit=limit,
         )
         if not rows and len(q.strip()) >= 2:
-            rec = resolve_stock(q.strip())
-            if rec and rec.get("trading_status") != "UNVERIFIED":
-                rows = [rec]
-        out = [
-            {
-                "stock_id": r.get("stock_id"),
-                "symbol": r.get("nse_symbol") or r.get("bse_code") or r.get("stock_id"),
-                "nse_symbol": r.get("nse_symbol"),
-                "bse_code": r.get("bse_code"),
-                "name": r.get("company_name"),
-                "company_name": r.get("company_name"),
-                "series": r.get("series") or "EQ",
-                "isin": r.get("isin") or "",
-                "exchange": r.get("exchange") or "NSE",
-                "sector": r.get("sector") or "Indian Equities",
-                "industry": r.get("industry") or "Indian Listed Equity",
-                "market_cap_cr": r.get("market_cap_cr"),
-                "cap_tier": r.get("cap_tier"),
-                "screener_url": r.get("screener_url"),
-            }
-            for r in rows
-        ]
+            rows = _discover_many_via_yahoo(q.strip(), limit=min(limit, 8))
+            if not rows:
+                rec = resolve_stock(q.strip())
+                if rec and rec.get("trading_status") != "UNVERIFIED":
+                    rows = [rec]
+        q_clean = q.strip().upper()
+        out = []
+        for r in rows:
+            matched_by_bse = bool(q_clean and r.get("bse_code") and (q_clean == str(r.get("bse_code")).upper() or q_clean.endswith(".BO")))
+            ex_val = "BSE" if (matched_by_bse or exchange.upper() == "BSE") else (r.get("exchange") or "NSE")
+            out.append(
+                {
+                    "stock_id": r.get("stock_id"),
+                    "symbol": (r.get("bse_code") if (ex_val == "BSE" and not r.get("nse_symbol")) else None)
+                    or r.get("nse_symbol")
+                    or r.get("bse_code")
+                    or r.get("stock_id"),
+                    "nse_symbol": r.get("nse_symbol"),
+                    "bse_code": r.get("bse_code"),
+                    "name": r.get("company_name"),
+                    "company_name": r.get("company_name"),
+                    "series": r.get("series") or "EQ",
+                    "isin": r.get("isin") or "",
+                    "exchange": ex_val,
+                    "sector": r.get("sector") or "Indian Equities",
+                    "industry": r.get("industry") or "Indian Listed Equity",
+                    "market_cap_cr": r.get("market_cap_cr"),
+                    "cap_tier": r.get("cap_tier"),
+                    "screener_url": r.get("screener_url"),
+                }
+            )
         return {"results": out}
 
     # --- WATCHLIST ---
@@ -363,6 +381,16 @@ def build_router():
         )
         rows = query_all("SELECT symbol, exchange, sector, added_at FROM watchlists ORDER BY added_at DESC")
         return {"watchlist": rows, "updated_at": now_iso}
+
+    @router.delete("/watchlist/{symbol}")
+    def delete_watchlist(symbol: str, exchange: Optional[str] = None):
+        clean = symbol.strip().upper().replace(".NS", "").replace(".BO", "")
+        if exchange:
+            execute_sql("DELETE FROM watchlists WHERE UPPER(symbol) = ? AND UPPER(exchange) = ?", (clean, exchange.upper()))
+        else:
+            execute_sql("DELETE FROM watchlists WHERE UPPER(symbol) = ?", (clean,))
+        rows = query_all("SELECT symbol, exchange, sector, added_at FROM watchlists ORDER BY added_at DESC")
+        return {"watchlist": rows, "updated_at": datetime.now(tz=IST).isoformat()}
 
     # --- SCANNERS ---
     @router.get("/scanner")
@@ -472,6 +500,7 @@ def build_router():
             analysis_type=payload.analysis_type,
             timeframe=payload.timeframe,
             strategy=payload.strategy,
+            company_name=payload.company_name,
         )
 
     # --- FUNDAMENTALS & SCREENER.IN DATA CENTER ---
@@ -592,7 +621,7 @@ def build_router():
 
     @router.get("/backtest")
     def backtest_get(
-        symbol: str = "RELIANCE",
+        symbol: str,
         strategy: str = "ema_crossover",
         timeframe: str = "1d",
         capital: float = 1000000.0,

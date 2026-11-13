@@ -49,3 +49,25 @@ export interface RiskConfig {
   paper_trading_enabled: boolean;
   fno_enabled: boolean;
 }
+
+export interface SelectedStock {
+  stock_id?: string;
+  symbol: string;
+  companyName: string;
+  exchange: 'NSE' | 'BSE';
+  nseSymbol?: string;
+  bseCode?: string;
+  isin?: string;
+  sector?: string;
+  industry?: string;
+  capTier?: string | null;
+}
+
+export interface WatchlistItem {
+  symbol: string;
+  exchange: 'NSE' | 'BSE';
+  sector?: string;
+  company_name?: string;
+  added_at?: string;
+}
+

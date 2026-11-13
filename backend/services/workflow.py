@@ -36,6 +36,7 @@ def run_analysis(
     timeframe: str = "1d",
     strategy: str = "ema_crossover",
     execute_paper_if_ready: bool = False,
+    company_name: str | None = None,
 ) -> Dict[str, Any]:
     """
     Reusable dynamic 12-stage analysis pipeline for ANY Indian stock (NSE, BSE, SME, ISIN, BSE Code, or Company Name):
@@ -43,6 +44,8 @@ def run_analysis(
     Entry Timing -> Exit Planner -> Backtest + Monte Carlo -> Position Sizing -> Risk Gate -> Trade Plan -> Alerts & Portfolio.
     """
     stock_meta = resolve_stock(symbol, exchange=exchange)
+    if company_name and (not stock_meta.get("company_name") or stock_meta.get("company_name") == stock_meta.get("nse_symbol")):
+        stock_meta["company_name"] = company_name
     clean = stock_meta.get("nse_symbol") or stock_meta.get("bse_code") or normalize_symbol(symbol)
     resolved_exchange = stock_meta.get("exchange") or exchange
     pm = get_provider_manager()
@@ -278,6 +281,7 @@ def run_analysis(
                 now_iso,
             ),
         )
+        tech_latest = tech.get("latest") or {}
         sig_id = f"SIG-{stock_meta['stock_id']}-{timeframe}-{strategy}"
         execute_sql(
             """
@@ -299,8 +303,8 @@ def run_analysis(
                 timeframe,
                 strategy,
                 entry_res.get("status", "WATCH"),
-                float(indicators.get("rsi14") or 0.0),
-                float(latest_price or 0.0),
+                float(tech_latest.get("rsi14") or 0.0),
+                float(tech_latest.get("close") or 0.0),
                 json.dumps(entry_res.get("reasons", [])),
                 now_iso,
             ),

@@ -49,11 +49,12 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [cRes, listRes, scrRes] = await Promise.all([
-        apiFetch(`/api/screener/company/${encodeURIComponent(symbol)}`),
+      const requests: Promise<Response>[] = [
+        symbol ? apiFetch(`/api/screener/company/${encodeURIComponent(symbol)}`) : Promise.resolve(new Response(JSON.stringify(null))),
         apiFetch('/api/screener/companies'),
         apiFetch('/api/screener/screens'),
-      ]);
+      ];
+      const [cRes, listRes, scrRes] = await Promise.all(requests);
       const [cJson, listJson, scrJson] = await Promise.all([cRes.json(), listRes.json(), scrRes.json()]);
       setCompanyData(cJson);
       setImportedCompanies(listJson.companies || []);
@@ -281,7 +282,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-xl font-bold text-slate-100">
-            Screener.in Data Center — {meta.company_name || symbol} ({meta.nse_symbol || symbol})
+            Screener.in Data Center{symbol ? ` — ${meta.company_name || symbol} (${meta.nse_symbol || symbol})` : ' — Import & Screening'}
           </h1>
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
             <span>Source: {companyData?.source || 'No Screener Export Imported Yet'}</span>

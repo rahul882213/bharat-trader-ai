@@ -178,40 +178,49 @@ app.get('/api/symbols/search', async (req, res) => {
     const data = await runPythonSnippet(
       `
 import json, sys
-from backend.database.stock_master_db import search_stock_master, resolve_stock
+from backend.database.stock_master_db import _discover_many_via_yahoo, search_stock_master, resolve_stock
 p = json.loads(sys.argv[1])
+q_raw = (p["q"] or "").strip()
 rows = search_stock_master(
-    query=p["q"],
+    query=q_raw,
     sector=p["sector"],
     industry=p["industry"],
     cap_tier=p["cap_tier"],
     exchange=p["exchange"],
     limit=p["limit"],
 )
-# If user typed a specific stock symbol/name not matched locally, run dynamic discovery
-if not rows and len(p["q"]) >= 2:
-    rec = resolve_stock(p["q"])
-    if rec and rec.get("trading_status") != "UNVERIFIED":
-        rows = [rec]
-out = [
-    {
+# If user typed a specific stock symbol/BSE code/name not matched locally, run dynamic discovery
+if not rows and len(q_raw) >= 2:
+    rows = _discover_many_via_yahoo(q_raw, limit=min(int(p["limit"]), 8))
+    if not rows:
+        rec = resolve_stock(q_raw)
+        if rec and rec.get("trading_status") != "UNVERIFIED":
+            rows = [rec]
+q_clean = q_raw.upper()
+req_exch = str(p.get("exchange") or "ALL").upper()
+out = []
+for r in rows:
+    matched_by_bse = bool(q_clean and r.get("bse_code") and (q_clean == str(r.get("bse_code")).upper() or q_clean.endswith(".BO")))
+    ex_val = "BSE" if (matched_by_bse or req_exch == "BSE") else (r.get("exchange") or "NSE")
+    out.append({
         "stock_id": r.get("stock_id"),
-        "symbol": r.get("nse_symbol") or r.get("bse_code") or r.get("stock_id"),
+        "symbol": (r.get("bse_code") if (ex_val == "BSE" and not r.get("nse_symbol")) else None)
+        or r.get("nse_symbol")
+        or r.get("bse_code")
+        or r.get("stock_id"),
         "nse_symbol": r.get("nse_symbol"),
         "bse_code": r.get("bse_code"),
         "name": r.get("company_name"),
         "company_name": r.get("company_name"),
         "series": r.get("series") or "EQ",
         "isin": r.get("isin") or "",
-        "exchange": r.get("exchange") or "NSE",
+        "exchange": ex_val,
         "sector": r.get("sector") or "Indian Equities",
         "industry": r.get("industry") or "Indian Listed Equity",
         "market_cap_cr": r.get("market_cap_cr"),
         "cap_tier": r.get("cap_tier"),
         "screener_url": r.get("screener_url"),
-    }
-    for r in rows
-]
+    })
 print(json.dumps({"results": out}))
       `,
       { q, sector, industry, cap_tier: capTier, exchange, limit }
@@ -233,14 +242,28 @@ app.get('/api/watchlist', async (_req, res) => {
 
 app.post('/api/watchlist', async (req, res) => {
   try {
-    const { symbol, exchange = 'NSE', sector = 'Indian Equities' } = req.body || {};
+    const { symbol, exchange = 'NSE', sector = 'Indian Equities', company_name } = req.body || {};
     if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
     const filePath = path.join(ROOT_DIR, 'trader', 'watchlist.json');
     const current = JSON.parse(await fs.readFile(filePath, 'utf-8'));
     const clean = String(symbol).trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
-    if (!current.watchlist.some((w: any) => w.symbol === clean)) {
-      current.watchlist.unshift({ symbol: clean, exchange, sector });
+    if (!current.watchlist.some((w: any) => w.symbol === clean && (w.exchange || 'NSE') === exchange)) {
+      current.watchlist.unshift({ symbol: clean, exchange, sector, ...(company_name ? { company_name } : {}) });
     }
+    current.updated_at = new Date().toISOString();
+    await fs.writeFile(filePath, JSON.stringify(current, null, 2));
+    res.json(current);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/watchlist/:symbol', async (req, res) => {
+  try {
+    const clean = String(req.params.symbol || '').trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
+    const filePath = path.join(ROOT_DIR, 'trader', 'watchlist.json');
+    const current = JSON.parse(await fs.readFile(filePath, 'utf-8'));
+    current.watchlist = (current.watchlist || []).filter((w: any) => String(w.symbol).toUpperCase() !== clean);
     current.updated_at = new Date().toISOString();
     await fs.writeFile(filePath, JSON.stringify(current, null, 2));
     res.json(current);
@@ -614,13 +637,16 @@ app.get('/api/news', async (req, res) => {
 app.post('/api/backtest', async (req, res) => {
   try {
     const {
-      symbol = 'RELIANCE',
+      symbol,
       strategy = 'ema_crossover',
       timeframe = '1d',
       capital = 1000000,
       trade_type = 'equity_intraday',
       runs = 10000,
     } = req.body || {};
+    if (!symbol || !String(symbol).trim()) {
+      return res.status(400).json({ error: 'Symbol is required for backtest' });
+    }
     const data = await runPythonCli([
       'backtest',
       '--symbol',

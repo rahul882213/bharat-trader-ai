@@ -75,10 +75,11 @@ export const AlertsSettingsSection: React.FC<Props> = ({ symbol }) => {
         <form onSubmit={addAlert} className="bg-[#0f1626] border border-slate-800 rounded-lg p-5 space-y-3 text-xs">
           <h2 className="font-display text-sm font-semibold text-slate-100">Create Alert Rule</h2>
           <div>
-            <label className="block text-slate-400 mb-1">NSE Symbol</label>
+            <label className="block text-slate-400 mb-1">NSE / BSE Symbol</label>
             <input
               type="text"
               required
+              placeholder="Enter NSE/BSE symbol (e.g. ORIANA)"
               value={form.symbol}
               onChange={(e) => setForm({ ...form, symbol: e.target.value.toUpperCase() })}
               className="w-full bg-[#0a0f1c] border border-slate-700 rounded px-2.5 py-2 font-mono text-slate-100"
