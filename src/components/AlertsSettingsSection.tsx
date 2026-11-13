@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing, Trash2 } from 'lucide-react';
 import { formatINR, formatISTTime } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   symbol: string;
@@ -23,7 +24,7 @@ export const AlertsSettingsSection: React.FC<Props> = ({ symbol }) => {
   }, [symbol]);
 
   const loadData = async () => {
-    const [aRes, bRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/brokers/status')]);
+    const [aRes, bRes] = await Promise.all([apiFetch('/api/alerts'), apiFetch('/api/brokers/status')]);
     const [aJson, bJson] = await Promise.all([aRes.json(), bRes.json()]);
     setAlerts(aJson.alerts || []);
     setBrokers(bJson);
@@ -35,7 +36,7 @@ export const AlertsSettingsSection: React.FC<Props> = ({ symbol }) => {
 
   const addAlert = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/alerts', {
+    await apiFetch('/api/alerts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
@@ -45,7 +46,7 @@ export const AlertsSettingsSection: React.FC<Props> = ({ symbol }) => {
   };
 
   const runCheck = async () => {
-    const res = await fetch('/api/alerts/check', { method: 'POST' });
+    const res = await apiFetch('/api/alerts/check', { method: 'POST' });
     const json = await res.json();
     setAlerts(json.all_alerts || []);
     setCheckSummary(
@@ -56,7 +57,7 @@ export const AlertsSettingsSection: React.FC<Props> = ({ symbol }) => {
   };
 
   const removeAlert = async (id: string) => {
-    await fetch(`/api/alerts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await apiFetch(`/api/alerts/${encodeURIComponent(id)}`, { method: 'DELETE' });
     await loadData();
   };
 

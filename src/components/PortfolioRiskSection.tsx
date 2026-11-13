@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { formatINR, formatISTTime } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 export const PortfolioRiskSection: React.FC = () => {
   const [portfolioData, setPortfolioData] = useState<any>(null);
@@ -35,8 +36,8 @@ export const PortfolioRiskSection: React.FC = () => {
     setLoading(true);
     try {
       const [pRes, rRes] = await Promise.all([
-        fetch(`/api/portfolio${liveLtp ? '?live=1' : ''}`),
-        fetch('/api/risk'),
+        apiFetch(`/api/portfolio${liveLtp ? '?live=1' : ''}`),
+        apiFetch('/api/risk'),
       ]);
       const [pJson, rJson] = await Promise.all([pRes.json(), rRes.json()]);
       setPortfolioData(pJson);
@@ -60,7 +61,7 @@ export const PortfolioRiskSection: React.FC = () => {
   };
 
   const calculateSize = async () => {
-    const res = await fetch('/api/budget/calculate', {
+    const res = await apiFetch('/api/budget/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -86,7 +87,7 @@ export const PortfolioRiskSection: React.FC = () => {
     e.preventDefault();
     setSavingRisk(true);
     try {
-      await fetch('/api/risk/config', {
+      await apiFetch('/api/risk/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(riskForm),
@@ -99,7 +100,7 @@ export const PortfolioRiskSection: React.FC = () => {
   };
 
   const squareOff = async (pos: any) => {
-    await fetch('/api/positions/close', {
+    await apiFetch('/api/positions/close', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Database, RefreshCw } from 'lucide-react';
 import { formatCrores, formatINR, formatISTTime } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   symbol: string;
@@ -17,7 +18,7 @@ export const FundamentalSection: React.FC<Props> = ({ symbol, exchange, onOpenSc
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/fundamentals/${encodeURIComponent(symbol)}?exchange=${exchange}${refresh ? '&refresh=1' : ''}`
       );
       const json = await res.json();

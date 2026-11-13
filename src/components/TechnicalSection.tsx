@@ -3,6 +3,7 @@ import { CheckCircle2, Sparkles } from 'lucide-react';
 import { CandlestickTerminalChart } from './CandlestickTerminalChart';
 import { ApprovalModal } from './ApprovalModal';
 import { formatINR, formatISTTime, formatVolume } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   symbol: string;
@@ -40,9 +41,9 @@ export const TechnicalSection: React.FC<Props> = ({ symbol, exchange, onChangeEx
     setOrderResult(null);
     try {
       const [cRes, enRes, exRes] = await Promise.all([
-        fetch(`/api/chart/${encodeURIComponent(symbol)}?timeframe=${timeframe}&exchange=${exchange}`),
-        fetch(`/api/entry/${encodeURIComponent(symbol)}?timeframe=${timeframe}&exchange=${exchange}`),
-        fetch(`/api/exit/${encodeURIComponent(symbol)}?timeframe=${timeframe}&product=${product}&exchange=${exchange}`),
+        apiFetch(`/api/chart/${encodeURIComponent(symbol)}?timeframe=${timeframe}&exchange=${exchange}`),
+        apiFetch(`/api/entry/${encodeURIComponent(symbol)}?timeframe=${timeframe}&exchange=${exchange}`),
+        apiFetch(`/api/exit/${encodeURIComponent(symbol)}?timeframe=${timeframe}&product=${product}&exchange=${exchange}`),
       ]);
       const [cJson, enJson, exJson] = await Promise.all([cRes.json(), enRes.json(), exRes.json()]);
       if (!cJson.available) throw new Error(cJson.error || `Market data unavailable for ${symbol}`);
@@ -51,11 +52,11 @@ export const TechnicalSection: React.FC<Props> = ({ symbol, exchange, onChangeEx
       setExitData(exJson);
 
       if (exJson?.available && exJson.entry_price && exJson.initial_stop_loss) {
-        const riskRes = await fetch('/api/risk');
+        const riskRes = await apiFetch('/api/risk');
         const riskJson = await riskRes.json();
         const cap = riskJson?.total_capital_inr || 1000000;
         const rPct = riskJson?.config?.max_risk_per_trade_pct || 1.0;
-        const szRes = await fetch('/api/budget/calculate', {
+        const szRes = await apiFetch('/api/budget/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -94,7 +95,7 @@ export const TechnicalSection: React.FC<Props> = ({ symbol, exchange, onChangeEx
       order_type: 'LIMIT',
       broker: execBroker,
     };
-    const prevRes = await fetch('/api/orders/preview', {
+    const prevRes = await apiFetch('/api/orders/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(draft),
@@ -109,7 +110,7 @@ export const TechnicalSection: React.FC<Props> = ({ symbol, exchange, onChangeEx
     try {
       const qty = Math.max(1, sizingData?.quantity || 1);
       const mode = execBroker === 'paper' ? 'paper' : 'live';
-      const res = await fetch('/api/orders/execute', {
+      const res = await apiFetch('/api/orders/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -142,7 +143,7 @@ export const TechnicalSection: React.FC<Props> = ({ symbol, exchange, onChangeEx
     setAiLoading(true);
     setAiError(null);
     try {
-      const res = await fetch('/api/ai/research', {
+      const res = await apiFetch('/api/ai/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

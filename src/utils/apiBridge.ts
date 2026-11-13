@@ -1,5 +1,6 @@
 /**
  * Configurable Client API Bridge for Bharat Trader AI.
+ * - Never mutates window.fetch (compatible with getter-only iframe shims and CSP).
  * - Uses VITE_API_BASE_URL (HTTPS backend URL e.g. Render) when configured, or runtime
  *   saved URL (?api=https://... / localStorage), or same-origin when hosted full-stack.
  * - On static hosts (e.g. GitHub Pages) when no live backend is connected, serves real
@@ -49,7 +50,7 @@ export function getBackendBaseUrl(): string {
     const stored = localStorage.getItem(STORAGE_KEY) || '';
     if (stored) return stored.replace(/\/+$/, '');
   } catch {
-    // Ignore storage errors
+    // Ignore storage errors in restricted iframe environments
   }
   return getConfiguredEnvApiUrl();
 }
@@ -65,9 +66,13 @@ export function getDisplayBackendUrl(): string {
 
 export function setBackendBaseUrl(url: string) {
   if (typeof window === 'undefined') return;
-  const cleaned = url.trim().replace(/\/+$/, '');
-  if (cleaned) localStorage.setItem(STORAGE_KEY, cleaned);
-  else localStorage.removeItem(STORAGE_KEY);
+  try {
+    const cleaned = url.trim().replace(/\/+$/, '');
+    if (cleaned) localStorage.setItem(STORAGE_KEY, cleaned);
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage errors
+  }
   isStaticMode = false;
   window.dispatchEvent(new CustomEvent(STATIC_EVENT, { detail: false }));
 }
@@ -83,10 +88,10 @@ function markStaticMode() {
   }
 }
 
-async function loadStaticMaster(origFetch: typeof fetch): Promise<any[]> {
+async function loadStaticMaster(): Promise<any[]> {
   if (cachedMaster) return cachedMaster;
   const base = ((import.meta as any).env?.BASE_URL || '/').replace(/\/?$/, '/');
-  const res = await origFetch(`${base}stocks-master.json`);
+  const res = await window.fetch(`${base}stocks-master.json`);
   if (!res.ok) return [];
   const data = await res.json();
   cachedMaster = Array.isArray(data) ? data : [];
@@ -174,13 +179,13 @@ export async function checkBackendHealth(): Promise<BackendHealthStatus> {
   }
 }
 
-async function handleStaticFallback(urlPath: string, origFetch: typeof fetch): Promise<Response> {
+async function handleStaticFallback(urlPath: string): Promise<Response> {
   markStaticMode();
   const parsed = new URL(urlPath, window.location.origin);
   const path = parsed.pathname;
 
   if (path === '/api/symbols/search') {
-    const master = await loadStaticMaster(origFetch);
+    const master = await loadStaticMaster();
     const q = (parsed.searchParams.get('q') || '').trim().toUpperCase();
     const limit = Math.min(Number(parsed.searchParams.get('limit') || 25), 100);
     if (!q) return jsonResponse({ results: master.slice(0, limit) });
@@ -211,7 +216,7 @@ async function handleStaticFallback(urlPath: string, origFetch: typeof fetch): P
   }
 
   if (path.startsWith('/api/stocks/resolve/')) {
-    const master = await loadStaticMaster(origFetch);
+    const master = await loadStaticMaster();
     const raw = decodeURIComponent(path.replace('/api/stocks/resolve/', '')).trim().toUpperCase();
     const hit =
       master.find(
@@ -237,7 +242,7 @@ async function handleStaticFallback(urlPath: string, origFetch: typeof fetch): P
   }
 
   if (path === '/api/stocks/master/stats') {
-    const master = await loadStaticMaster(origFetch);
+    const master = await loadStaticMaster();
     const capTiers: Record<string, number> = {};
     const sectors = new Set<string>();
     for (const r of master) {
@@ -292,42 +297,39 @@ async function handleStaticFallback(urlPath: string, origFetch: typeof fetch): P
   );
 }
 
-export function installApiBridge() {
-  if (typeof window === 'undefined' || (window as any).__bharatApiBridgeInstalled) return;
-  (window as any).__bharatApiBridgeInstalled = true;
+/**
+ * Safe API fetch wrapper that routes /api/* calls to configured VITE_API_BASE_URL (HTTPS)
+ * or falls back cleanly on static GitHub Pages without mutating read-only window.fetch.
+ */
+export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const rawUrl =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
 
-  const origFetch = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const rawUrl =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+  if (!rawUrl.startsWith('/api/')) {
+    return window.fetch(input, init);
+  }
 
-    if (!rawUrl.startsWith('/api/')) {
-      return origFetch(input, init);
+  const baseUrl = getBackendBaseUrl();
+  const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+
+  if (!baseUrl && isGitHubPages) {
+    return handleStaticFallback(rawUrl);
+  }
+
+  const targetUrl = baseUrl ? `${baseUrl}${rawUrl}` : rawUrl;
+
+  try {
+    const res = await window.fetch(targetUrl, init);
+    const ct = res.headers.get('content-type') || '';
+    if (res.status === 404 || (!ct.includes('application/json') && !res.ok)) {
+      return handleStaticFallback(rawUrl);
     }
-
-    const baseUrl = getBackendBaseUrl();
-    const isGitHubPages = window.location.hostname.endsWith('github.io');
-
-    // On GitHub Pages with no backend URL configured, avoid firing doomed 404 calls
-    if (!baseUrl && isGitHubPages) {
-      return handleStaticFallback(rawUrl, origFetch);
-    }
-
-    const targetUrl = baseUrl ? `${baseUrl}${rawUrl}` : rawUrl;
-
-    try {
-      const res = await origFetch(targetUrl, init);
-      const ct = res.headers.get('content-type') || '';
-      if (res.status === 404 || (!ct.includes('application/json') && !res.ok)) {
-        return handleStaticFallback(rawUrl, origFetch);
-      }
-      return res;
-    } catch {
-      return handleStaticFallback(rawUrl, origFetch);
-    }
-  };
+    return res;
+  } catch {
+    return handleStaticFallback(rawUrl);
+  }
 }

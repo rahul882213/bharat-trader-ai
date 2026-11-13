@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatINR } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   symbol: string;
@@ -30,7 +31,7 @@ export const BacktestSection: React.FC<Props> = ({ symbol }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/backtest', {
+      const res = await apiFetch('/api/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

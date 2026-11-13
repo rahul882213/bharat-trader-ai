@@ -26,6 +26,7 @@ import { PortfolioRiskSection } from './components/PortfolioRiskSection';
 import { AlertsSettingsSection } from './components/AlertsSettingsSection';
 import { formatINR, formatISTTime } from './utils/formatters';
 import {
+  apiFetch,
   BackendHealthStatus,
   checkBackendHealth,
   getBackendBaseUrl,
@@ -85,7 +86,7 @@ export default function App() {
   // Sync canonical metadata whenever selectedSymbol changes
   useEffect(() => {
     let active = true;
-    fetch(`/api/stocks/resolve/${encodeURIComponent(selectedSymbol)}?exchange=${exchange}`)
+    apiFetch(`/api/stocks/resolve/${encodeURIComponent(selectedSymbol)}?exchange=${exchange}`)
       .then((r) => r.json())
       .then((rec) => {
         if (!active || !rec) return;
@@ -105,7 +106,7 @@ export default function App() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/symbols/search?q=${encodeURIComponent(q)}&limit=25`);
+        const res = await apiFetch(`/api/symbols/search?q=${encodeURIComponent(q)}&limit=25`);
         const json = await res.json();
         setSearchResults(json.results || []);
         setSearchOpen(true);
@@ -134,7 +135,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch(`/api/stocks/resolve/${encodeURIComponent(q)}`);
+      const res = await apiFetch(`/api/stocks/resolve/${encodeURIComponent(q)}`);
       const rec = await res.json();
       const sym = rec.nse_symbol || rec.bse_code || q.toUpperCase();
       handleSelectSymbol(sym, activeNav === 'overview' ? 'technical' : activeNav, rec.company_name);
@@ -148,7 +149,7 @@ export default function App() {
     setWorkflowLoading(true);
     setWorkflowError(null);
     try {
-      const res = await fetch('/api/workflow/run', {
+      const res = await apiFetch('/api/workflow/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol: selectedSymbol, exchange, analysis_type: 'full', timeframe: '1d' }),

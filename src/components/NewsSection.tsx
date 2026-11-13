@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import { formatISTTime } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   symbol: string;
@@ -18,7 +19,7 @@ export const NewsSection: React.FC<Props> = ({ symbol }) => {
       const qs = new URLSearchParams({ limit: '35' });
       if (scope === 'symbol') qs.set('symbol', symbol);
       if (refresh) qs.set('refresh', '1');
-      const res = await fetch(`/api/news?${qs.toString()}`);
+      const res = await apiFetch(`/api/news?${qs.toString()}`);
       setData(await res.json());
     } finally {
       setLoading(false);

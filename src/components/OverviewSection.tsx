@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { formatINR, formatISTTime, formatPct, formatVolume } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   onSelectSymbol: (sym: string) => void;
@@ -17,8 +18,8 @@ export const OverviewSection: React.FC<Props> = ({ onSelectSymbol }) => {
     setError(null);
     try {
       const [ovRes, brRes] = await Promise.all([
-        fetch(`/api/market/overview${refresh ? '?refresh=1' : ''}`),
-        fetch('/api/report/daily'),
+        apiFetch(`/api/market/overview${refresh ? '?refresh=1' : ''}`),
+        apiFetch('/api/report/daily'),
       ]);
       const ov = await ovRes.json();
       const br = await brRes.json();

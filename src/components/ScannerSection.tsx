@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Globe, Play, Radar } from 'lucide-react';
 import { formatCrores, formatINR, formatISTTime, formatPct } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   onSelectSymbol: (sym: string) => void;
@@ -54,7 +55,7 @@ export const ScannerSection: React.FC<Props> = ({ onSelectSymbol, initialMode = 
   }, [initialMode]);
 
   useEffect(() => {
-    fetch('/api/stocks/master/stats')
+    apiFetch('/api/stocks/master/stats')
       .then((r) => r.json())
       .then((j) => setMasterStats(j || {}))
       .catch(() => {});
@@ -86,7 +87,7 @@ export const ScannerSection: React.FC<Props> = ({ onSelectSymbol, initialMode = 
         if (refresh) params.set('refresh', '1');
         url = `/api/scanner/market-wide?${params.toString()}`;
       }
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setData(json);

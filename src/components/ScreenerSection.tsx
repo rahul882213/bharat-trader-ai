@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Download, ExternalLink, FileSpreadsheet, Globe, Link2, Save, Upload } from 'lucide-react';
 import { formatCrores, formatINR, formatISTTime } from '../utils/formatters';
+import { apiFetch } from '../utils/apiBridge';
 
 interface Props {
   symbol: string;
@@ -49,9 +50,9 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
     setLoading(true);
     try {
       const [cRes, listRes, scrRes] = await Promise.all([
-        fetch(`/api/screener/company/${encodeURIComponent(symbol)}`),
-        fetch('/api/screener/companies'),
-        fetch('/api/screener/screens'),
+        apiFetch(`/api/screener/company/${encodeURIComponent(symbol)}`),
+        apiFetch('/api/screener/companies'),
+        apiFetch('/api/screener/screens'),
       ]);
       const [cJson, listJson, scrJson] = await Promise.all([cRes.json(), listRes.json(), scrRes.json()]);
       setCompanyData(cJson);
@@ -84,7 +85,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
     setStatusMsg(null);
     try {
       const text = await file.text();
-      const res = await fetch('/api/screener/import-csv', {
+      const res = await apiFetch('/api/screener/import-csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,7 +124,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
         reader.onerror = () => reject(new Error('Failed to read Excel file'));
         reader.readAsDataURL(file);
       });
-      const res = await fetch('/api/screener/import-xlsx', {
+      const res = await apiFetch('/api/screener/import-xlsx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,7 +153,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
   };
 
   const downloadCsvTemplate = async () => {
-    const res = await fetch('/api/screener/template-csv');
+    const res = await apiFetch('/api/screener/template-csv');
     const json = await res.json();
     const blob = new Blob([json.csv || ''], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -166,7 +167,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
   const saveUrlAssociation = async () => {
     if (!screenerUrlInput.trim()) return;
     setStatusMsg(null);
-    const res = await fetch('/api/screener/associate-url', {
+    const res = await apiFetch('/api/screener/associate-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol, screener_url: screenerUrlInput.trim(), statement_scope: statementScope }),
@@ -182,7 +183,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
     setUploading(true);
     setStatusMsg(null);
     try {
-      const res = await fetch('/api/screener/optional-public-fetch', {
+      const res = await apiFetch('/api/screener/optional-public-fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol, statement_scope: statementScope }),
@@ -208,7 +209,7 @@ export const ScreenerSection: React.FC<Props> = ({ symbol, onSelectSymbol }) => 
       const payload: Record<string, any> = { ...notesForm };
       if (notesForm.order_book_cr) payload.order_book_cr = Number(notesForm.order_book_cr);
       if (notesForm.order_inflow_cr) payload.order_inflow_cr = Number(notesForm.order_inflow_cr);
-      const res = await fetch('/api/screener/business-notes', {
+      const res = await apiFetch('/api/screener/business-notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol, notes: payload }),
