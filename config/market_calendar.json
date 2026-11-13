@@ -1,0 +1,56 @@
+{
+  "exchange": "NSE/BSE",
+  "timezone": "Asia/Kolkata",
+  "regular_session": {
+    "pre_open_start": "09:00",
+    "pre_open_end": "09:15",
+    "market_open": "09:15",
+    "market_close": "15:30",
+    "post_close_end": "16:00",
+    "intraday_mis_squareoff": "15:15",
+    "trading_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+  },
+  "holidays": {
+    "2025": [
+      { "date": "2025-02-26", "name": "Mahashivratri" },
+      { "date": "2025-03-14", "name": "Holi" },
+      { "date": "2025-03-31", "name": "Id-Ul-Fitr (Ramzan Id)" },
+      { "date": "2025-04-10", "name": "Shri Mahavir Jayanti" },
+      { "date": "2025-04-14", "name": "Dr. Baba Saheb Ambedkar Jayanti" },
+      { "date": "2025-04-18", "name": "Good Friday" },
+      { "date": "2025-05-01", "name": "Maharashtra Day" },
+      { "date": "2025-08-15", "name": "Independence Day" },
+      { "date": "2025-08-27", "name": "Ganesh Chaturthi" },
+      { "date": "2025-10-02", "name": "Mahatma Gandhi Jayanti / Dussehra" },
+      { "date": "2025-10-21", "name": "Diwali Laxmi Pujan (Muhurat Session Only)" },
+      { "date": "2025-10-22", "name": "Diwali Balipratipada" },
+      { "date": "2025-11-05", "name": "Prakash Gurpurb Sri Guru Nanak Dev Ji" },
+      { "date": "2025-12-25", "name": "Christmas" }
+    ],
+    "2026": [
+      { "date": "2026-01-26", "name": "Republic Day" },
+      { "date": "2026-03-03", "name": "Holi" },
+      { "date": "2026-03-20", "name": "Id-Ul-Fitr (Ramzan Id)" },
+      { "date": "2026-03-26", "name": "Shri Ram Navami" },
+      { "date": "2026-03-31", "name": "Shri Mahavir Jayanti" },
+      { "date": "2026-04-03", "name": "Good Friday" },
+      { "date": "2026-04-14", "name": "Dr. Baba Saheb Ambedkar Jayanti" },
+      { "date": "2026-05-01", "name": "Maharashtra Day" },
+      { "date": "2026-05-28", "name": "Bakri Id" },
+      { "date": "2026-06-26", "name": "Muharram" },
+      { "date": "2026-09-14", "name": "Ganesh Chaturthi" },
+      { "date": "2026-10-02", "name": "Mahatma Gandhi Jayanti" },
+      { "date": "2026-10-20", "name": "Dussehra" },
+      { "date": "2026-11-08", "name": "Diwali Laxmi Pujan (Muhurat Session)" },
+      { "date": "2026-11-10", "name": "Diwali Balipratipada" },
+      { "date": "2026-11-24", "name": "Prakash Gurpurb Sri Guru Nanak Dev Ji" },
+      { "date": "2026-12-25", "name": "Christmas" }
+    ]
+  },
+  "special_sessions": [
+    { "date": "2025-02-01", "name": "Union Budget Special Saturday Trading Session", "open": "09:15", "close": "15:30" },
+    { "date": "2025-10-21", "name": "Diwali Muhurat Trading Session", "open": "18:00", "close": "19:00" },
+    { "date": "2026-02-01", "name": "Union Budget Special Session (Reference)", "open": "09:15", "close": "15:30" },
+    { "date": "2026-11-08", "name": "Diwali Muhurat Trading Session", "open": "18:00", "close": "19:00" }
+  ]
+}

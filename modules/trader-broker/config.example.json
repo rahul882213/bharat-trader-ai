@@ -1,0 +1,6 @@
+{
+  "paper_trading_enabled": true,
+  "default_broker": "paper",
+  "supported_live_brokers": ["zerodha", "upstox", "angel_one", "dhan"],
+  "require_explicit_live_confirmation": true
+}

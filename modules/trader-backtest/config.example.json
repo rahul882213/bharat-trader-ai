@@ -1,0 +1,7 @@
+{
+  "initial_capital_inr": 1000000.0,
+  "risk_per_trade_pct": 1.0,
+  "default_trade_type": "equity_intraday",
+  "default_broker": "zerodha",
+  "monte_carlo_runs": 10000
+}

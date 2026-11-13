@@ -1,0 +1,6 @@
+{
+  "name": "Bharat Trader AI",
+  "description": "Institutional-grade Indian stock market AI trading research, quantitative scanning, backtesting, risk management, and paper/broker execution terminal for NSE and BSE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

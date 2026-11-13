@@ -1,0 +1,5 @@
+{
+  "default_volume_spike_multiplier": 2.0,
+  "default_volatility_atr_multiplier": 2.2,
+  "telegram_enabled": false
+}

@@ -1,0 +1,16 @@
+# Core runtime works with Python 3.10+ standard library for zero-dependency CLI execution.
+# Install these packages for FastAPI standalone server, accelerated DataFrames, and pytest suite:
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pandas>=2.2.0
+numpy>=2.1.0
+pandas-ta>=0.3.14b0
+requests>=2.32.0
+python-dotenv>=1.0.1
+google-genai>=1.0.0
+pytest>=8.3.0
+httpx>=0.27.0
+sqlalchemy>=2.0.35
+psycopg2-binary>=2.9.9
+kiteconnect>=5.0.1

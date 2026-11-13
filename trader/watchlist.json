@@ -1,0 +1,17 @@
+{
+  "updated_at": null,
+  "watchlist": [
+    { "symbol": "RELIANCE", "exchange": "NSE", "sector": "Energy" },
+    { "symbol": "TCS", "exchange": "NSE", "sector": "IT" },
+    { "symbol": "HDFCBANK", "exchange": "NSE", "sector": "Banking" },
+    { "symbol": "ICICIBANK", "exchange": "NSE", "sector": "Banking" },
+    { "symbol": "INFY", "exchange": "NSE", "sector": "IT" },
+    { "symbol": "SBIN", "exchange": "NSE", "sector": "Banking" },
+    { "symbol": "HAL", "exchange": "NSE", "sector": "Defence" },
+    { "symbol": "TATAMOTORS", "exchange": "NSE", "sector": "Auto" },
+    { "symbol": "BHARTIARTL", "exchange": "NSE", "sector": "Telecom" },
+    { "symbol": "LT", "exchange": "NSE", "sector": "Infrastructure" },
+    { "symbol": "SUNPHARMA", "exchange": "NSE", "sector": "Pharma" },
+    { "symbol": "ORIANA", "exchange": "NSE", "sector": "Renewables" }
+  ]
+}

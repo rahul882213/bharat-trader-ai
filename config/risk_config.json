@@ -1,0 +1,42 @@
+{
+  "total_capital_inr": 1000000.0,
+  "max_risk_per_trade_pct": 1.0,
+  "max_daily_loss_pct": 3.0,
+  "min_risk_reward_ratio": 2.0,
+  "max_trades_per_day": 5,
+  "max_open_positions": 4,
+  "max_sector_exposure_pct": 30.0,
+  "max_portfolio_exposure_pct": 80.0,
+  "paper_trading_enabled": true,
+  "fno_enabled": false,
+  "require_explicit_live_confirmation": true,
+  "default_broker_charge_profile": "zerodha_equity_intraday",
+  "charge_profiles": {
+    "zerodha_equity_intraday": {
+      "brokerage_pct": 0.0003,
+      "brokerage_max_per_order_inr": 20.0,
+      "stt_sell_pct": 0.00025,
+      "exchange_txn_nse_pct": 0.0000297,
+      "sebi_fee_pct": 0.000001,
+      "stamp_duty_buy_pct": 0.00003,
+      "gst_pct": 0.18
+    },
+    "zerodha_equity_delivery": {
+      "brokerage_pct": 0.0,
+      "brokerage_max_per_order_inr": 0.0,
+      "stt_buy_sell_pct": 0.001,
+      "exchange_txn_nse_pct": 0.0000297,
+      "sebi_fee_pct": 0.000001,
+      "stamp_duty_buy_pct": 0.00015,
+      "gst_pct": 0.18
+    },
+    "zerodha_fno_futures": {
+      "brokerage_flat_per_order_inr": 20.0,
+      "stt_sell_pct": 0.0002,
+      "exchange_txn_nse_pct": 0.0000173,
+      "sebi_fee_pct": 0.000001,
+      "stamp_duty_buy_pct": 0.00002,
+      "gst_pct": 0.18
+    }
+  }
+}

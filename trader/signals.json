@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-11-13T10:37:28.040614+05:30",
+  "universe": "nifty50",
+  "scanned_count": 8,
+  "matched_count": 0,
+  "strategy": "orb",
+  "timeframe": "1d",
+  "exchange": "NSE",
+  "currency": "INR",
+  "data_source": "Yahoo Finance (Unofficial)",
+  "signals": [],
+  "errors": []
+}

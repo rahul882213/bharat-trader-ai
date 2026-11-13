@@ -1,0 +1,6 @@
+{
+  "default_capital_inr": 1000000.0,
+  "default_risk_pct": 1.0,
+  "default_segment": "cash_equity",
+  "fno_enabled": false
+}

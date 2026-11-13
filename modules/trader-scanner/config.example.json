@@ -1,0 +1,7 @@
+{
+  "default_universe": "nifty50",
+  "default_timeframe": "1d",
+  "min_volume_breakout_ratio": 1.8,
+  "min_gap_pct": 1.5,
+  "max_workers": 6
+}

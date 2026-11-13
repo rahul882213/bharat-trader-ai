@@ -1,0 +1,42 @@
+{
+  "app_name": "Bharat Trader AI",
+  "currency": "INR",
+  "currency_symbol": "₹",
+  "timezone": "Asia/Kolkata",
+  "default_exchange": "NSE",
+  "supported_exchanges": ["NSE", "BSE"],
+  "supported_indices": [
+    { "id": "NIFTY_50", "name": "NIFTY 50", "yahoo_symbol": "^NSEI", "exchange": "NSE" },
+    { "id": "BANK_NIFTY", "name": "NIFTY BANK", "yahoo_symbol": "^NSEBANK", "exchange": "NSE" },
+    { "id": "FIN_NIFTY", "name": "NIFTY FIN SERVICE", "yahoo_symbol": "^CNXFIN", "exchange": "NSE" },
+    { "id": "NIFTY_NEXT_50", "name": "NIFTY NEXT 50", "yahoo_symbol": "^NSMIDCP", "exchange": "NSE" },
+    { "id": "NIFTY_100", "name": "NIFTY 100", "yahoo_symbol": "^CNX100", "exchange": "NSE" },
+    { "id": "NIFTY_200", "name": "NIFTY 200", "yahoo_symbol": "^CNX200", "exchange": "NSE" },
+    { "id": "NIFTY_500", "name": "NIFTY 500", "yahoo_symbol": "^CRSLDX", "exchange": "NSE" },
+    { "id": "NIFTY_MIDCAP_150", "name": "NIFTY MIDCAP 150", "yahoo_symbol": "NIFTY_MIDCAP_150.NS", "exchange": "NSE" },
+    { "id": "NIFTY_SMALLCAP_250", "name": "NIFTY SMALLCAP 250", "yahoo_symbol": "NIFTY_SMALLCAP_250.NS", "exchange": "NSE" },
+    { "id": "INDIA_VIX", "name": "INDIA VIX", "yahoo_symbol": "^INDIAVIX", "exchange": "NSE" }
+  ],
+  "sectoral_indices": [
+    { "id": "NIFTY_IT", "name": "NIFTY IT", "yahoo_symbol": "^CNXIT" },
+    { "id": "NIFTY_AUTO", "name": "NIFTY AUTO", "yahoo_symbol": "^CNXAUTO" },
+    { "id": "NIFTY_PHARMA", "name": "NIFTY PHARMA", "yahoo_symbol": "^CNXPHARMA" },
+    { "id": "NIFTY_METAL", "name": "NIFTY METAL", "yahoo_symbol": "^CNXMETAL" },
+    { "id": "NIFTY_FMCG", "name": "NIFTY FMCG", "yahoo_symbol": "^CNXFMCG" },
+    { "id": "NIFTY_ENERGY", "name": "NIFTY ENERGY", "yahoo_symbol": "^CNXENERGY" },
+    { "id": "NIFTY_PSU_BANK", "name": "NIFTY PSU BANK", "yahoo_symbol": "^CNXPSUBANK" },
+    { "id": "NIFTY_REALTY", "name": "NIFTY REALTY", "yahoo_symbol": "^CNXREALTY" }
+  ],
+  "data_providers": {
+    "primary": "yahoo_unofficial",
+    "official_master_list": "nse_equity_csv",
+    "broker_realtime": "zerodha_kite",
+    "fallback_order": ["zerodha_kite", "upstox", "yahoo_unofficial"],
+    "stale_threshold_seconds": 300,
+    "rate_limit_delay_ms": 150
+  },
+  "trading_mode": "paper",
+  "broker_default": "paper",
+  "intraday_squareoff_ist": "15:15",
+  "supported_timeframes": ["1m", "5m", "15m", "30m", "1h", "1d"]
+}

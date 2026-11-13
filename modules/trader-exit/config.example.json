@@ -1,0 +1,6 @@
+{
+  "atr_stop_multiplier": 1.5,
+  "default_product": "MIS",
+  "intraday_squareoff_ist": "15:15",
+  "min_target2_rr": 2.0
+}

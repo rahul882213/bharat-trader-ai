@@ -1,0 +1,5 @@
+{
+  "max_articles": 30,
+  "include_regulatory_feeds": true,
+  "sources": ["RBI", "SEBI", "Economic Times", "Moneycontrol", "Business Standard", "CNBC-TV18"]
+}
