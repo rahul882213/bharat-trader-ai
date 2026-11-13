@@ -1,8 +1,273 @@
 {
-  "generated_at": null,
-  "symbol": null,
-  "entry": null,
-  "exit": null,
-  "position_sizing": null,
-  "risk_check": null
+  "generated_at": "2026-11-13T11:02:12.809784+05:30",
+  "symbol": "MAZDOCK",
+  "company_name": "Mazagon Dock Shipbuilders Limited",
+  "exchange": "NSE",
+  "sector": "Industrials",
+  "entry": {
+    "available": true,
+    "symbol": "MAZDOCK",
+    "exchange": "NSE",
+    "timeframe": "1d",
+    "status": "WATCH",
+    "ideal_entry_price": 1924.2,
+    "confirmation_candle": {
+      "date": "2026-11-12",
+      "open": 1893.0,
+      "high": 1927.3,
+      "low": 1885.7,
+      "close": 1907.0,
+      "volume": 504419,
+      "is_complete_candle": true
+    },
+    "forming_candle_ignored_for_breakout": true,
+    "live_forming_price": 1914.4,
+    "checks": {
+      "vwap_position": "ABOVE",
+      "vwap_value": 1906.67,
+      "ema_alignment": "BEARISH/MIXED",
+      "ema9": 1857.18,
+      "ema21": 1900.85,
+      "ema50": 2053.69,
+      "volume_confirmation": false,
+      "volume_ratio": 0.47,
+      "rsi14": 46.76,
+      "atr14": 64.81
+    },
+    "support_resistance": {
+      "supports": [
+        1687.5
+      ],
+      "resistances": [
+        1935.6,
+        2145.0,
+        2546.6
+      ],
+      "pivot": 1897.43
+    },
+    "preliminary_rr_ratio": 2.2,
+    "summary": "Setup developing; awaiting volume expansion (currently 0.47x < 1.30x), strong bullish candle close above prior high",
+    "source": "Yahoo Finance (Unofficial)",
+    "evaluated_at_ist": "2026-11-13T11:02:12.298501+05:30"
+  },
+  "exit": {
+    "available": true,
+    "symbol": "MAZDOCK",
+    "exchange": "NSE",
+    "side": "BUY",
+    "product": "CNC",
+    "entry_price": 1924.2,
+    "initial_stop_loss": 1766.08,
+    "trailing_stop_loss": 1810.35,
+    "trailing_rule": "Trail stop-loss to breakeven at Target 1 (\u20b92161.39); then trail by 1.2x ATR (\u20b975.90) or below EMA(21).",
+    "target_1": 2161.39,
+    "target_2": 2272.07,
+    "target_3": 2477.63,
+    "risk_per_share_inr": 158.12,
+    "risk_reward": {
+      "target_1_rr": 1.5,
+      "target_2_rr": 2.2,
+      "target_3_rr": 3.5
+    },
+    "atr14": 63.25,
+    "swing_high_10": 1927.3,
+    "swing_low_10": 1703.0,
+    "support_resistance": {
+      "supports": [
+        1687.5
+      ],
+      "resistances": [
+        1935.6,
+        2145.0,
+        2546.6
+      ],
+      "pivot": 1906.67
+    },
+    "exit_conditions": [
+      "Hard stop-loss execution at \u20b91766.08 (capital protection)",
+      "Book 40% partial profit at Target 1 (\u20b92161.39) and move stop to cost",
+      "Book 40% at Target 2 (\u20b92272.07); trail remaining 20% toward Target 3 (\u20b92477.63)",
+      "Exit immediately if a full candle closes below VWAP & EMA(21) on heavy volume"
+    ],
+    "time_based_exit": "Swing/Delivery CNC review after 10 trading sessions if Target 1 is not reached.",
+    "source": "Yahoo Finance (Unofficial)",
+    "generated_at_ist": "2026-11-13T11:02:12.301261+05:30"
+  },
+  "backtest_summary": {
+    "available": true,
+    "strategy": "ema_crossover",
+    "total_trades": 9,
+    "win_rate_pct": 22.22,
+    "profit_factor": 0.61,
+    "net_pnl_inr": -27525.47,
+    "monte_carlo_prob_profit_pct": 34.48
+  },
+  "position_sizing": {
+    "allowed": true,
+    "currency": "INR",
+    "segment": "cash_equity",
+    "trade_type": "equity_delivery",
+    "capital_inr": 1000000.0,
+    "risk_pct": 1.0,
+    "max_risk_budget_inr": 10000.0,
+    "entry_price": 1924.2,
+    "stop_loss": 1766.08,
+    "risk_per_share_inr": 158.12,
+    "quantity": 61,
+    "lots": null,
+    "lot_size": 1,
+    "position_value_inr": 117376.2,
+    "capital_utilization_pct": 11.74,
+    "price_risk_inr": 9645.32,
+    "estimated_charges_inr": 251.15,
+    "charge_breakdown": {
+      "buy_value": 117376.2,
+      "sell_value": 107730.88,
+      "turnover": 225107.08,
+      "brokerage": 0.0,
+      "stt": 225.0,
+      "exchange_txn_charge": 6.69,
+      "sebi_charges": 0.23,
+      "stamp_duty": 18.0,
+      "gst": 1.24,
+      "total_charges": 251.15,
+      "breakeven_points": 4.12,
+      "gross_pnl": -9645.32,
+      "net_pnl": -9896.47
+    },
+    "total_monetary_risk_inr": 9896.47
+  },
+  "risk_check": {
+    "symbol": "MAZDOCK",
+    "verdict": "PASS",
+    "trade_risk_inr": 9896.47,
+    "trade_value_inr": 117376.2,
+    "risk_reward_ratio": 2.2,
+    "checks": [
+      {
+        "rule": "Max Risk Per Trade",
+        "passed": true,
+        "actual": "\u20b99,896.47",
+        "limit": "\u20b910,000.00 (1.0%)"
+      },
+      {
+        "rule": "Max Daily Loss",
+        "passed": true,
+        "actual": "\u20b90.00",
+        "limit": "\u20b930,000.00 (3.0%)"
+      },
+      {
+        "rule": "Minimum Risk-to-Reward",
+        "passed": true,
+        "actual": "1:2.20",
+        "limit": "1:2.00"
+      },
+      {
+        "rule": "Max Trades Per Day",
+        "passed": true,
+        "actual": "0",
+        "limit": "5"
+      },
+      {
+        "rule": "Max Open Positions",
+        "passed": true,
+        "actual": "0",
+        "limit": "4"
+      },
+      {
+        "rule": "Sector Exposure (Industrials)",
+        "passed": true,
+        "actual": "11.7%",
+        "limit": "30.0%"
+      },
+      {
+        "rule": "Total Portfolio Exposure",
+        "passed": true,
+        "actual": "11.7%",
+        "limit": "80.0%"
+      }
+    ],
+    "violations": [],
+    "portfolio_state": {
+      "currency": "INR",
+      "total_capital_inr": 1000000.0,
+      "max_risk_per_trade_inr": 10000.0,
+      "max_daily_loss_inr": 30000.0,
+      "daily_realized_pnl_inr": 0,
+      "daily_loss_remaining_inr": 30000.0,
+      "daily_loss_breached": false,
+      "trades_today": 0,
+      "max_trades_per_day": 5,
+      "open_positions_count": 0,
+      "max_open_positions": 4,
+      "total_exposure_inr": 0,
+      "portfolio_exposure_pct": 0.0,
+      "max_portfolio_exposure_pct": 80.0,
+      "sector_exposure_inr": {},
+      "max_sector_exposure_pct": 30.0,
+      "min_risk_reward_ratio": 2.0,
+      "status": "NOMINAL",
+      "config": {
+        "total_capital_inr": 1000000.0,
+        "max_risk_per_trade_pct": 1.0,
+        "max_daily_loss_pct": 3.0,
+        "min_risk_reward_ratio": 2.0,
+        "max_trades_per_day": 5,
+        "max_open_positions": 4,
+        "max_sector_exposure_pct": 30.0,
+        "max_portfolio_exposure_pct": 80.0,
+        "paper_trading_enabled": true,
+        "fno_enabled": false,
+        "require_explicit_live_confirmation": true,
+        "default_broker_charge_profile": "zerodha_equity_intraday",
+        "charge_profiles": {
+          "zerodha_equity_intraday": {
+            "brokerage_pct": 0.0003,
+            "brokerage_max_per_order_inr": 20.0,
+            "stt_sell_pct": 0.00025,
+            "exchange_txn_nse_pct": 2.97e-05,
+            "sebi_fee_pct": 1e-06,
+            "stamp_duty_buy_pct": 3e-05,
+            "gst_pct": 0.18
+          },
+          "zerodha_equity_delivery": {
+            "brokerage_pct": 0.0,
+            "brokerage_max_per_order_inr": 0.0,
+            "stt_buy_sell_pct": 0.001,
+            "exchange_txn_nse_pct": 2.97e-05,
+            "sebi_fee_pct": 1e-06,
+            "stamp_duty_buy_pct": 0.00015,
+            "gst_pct": 0.18
+          },
+          "zerodha_fno_futures": {
+            "brokerage_flat_per_order_inr": 20.0,
+            "stt_sell_pct": 0.0002,
+            "exchange_txn_nse_pct": 1.73e-05,
+            "sebi_fee_pct": 1e-06,
+            "stamp_duty_buy_pct": 2e-05,
+            "gst_pct": 0.18
+          }
+        }
+      },
+      "checked_at_ist": "2026-11-13T11:02:12.809734+05:30"
+    }
+  },
+  "approval_preview": {
+    "requires_explicit_confirmation": true,
+    "order_summary": {
+      "symbol": "MAZDOCK",
+      "exchange": "NSE",
+      "side": "BUY",
+      "product": "CNC",
+      "order_type": "LIMIT",
+      "broker": "paper"
+    },
+    "quantity": 61,
+    "entry_price_inr": 1924.2,
+    "stop_loss_inr": 1766.08,
+    "target_inr": 2272.07,
+    "maximum_estimated_loss_inr": 9896.47,
+    "estimated_charges_inr": 251.15,
+    "confirmation_prompt": "CONFIRM LIVE ORDER: BUY 61 MAZDOCK @ \u20b91924.20 | SL \u20b91766.08 | Target \u20b92272.07 | Max Est. Loss \u20b99,896.47"
+  }
 }

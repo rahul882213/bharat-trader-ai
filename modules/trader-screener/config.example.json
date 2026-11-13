@@ -1,0 +1,5 @@
+{
+  "default_statement_scope": "Consolidated",
+  "update_existing_on_duplicate": true,
+  "enable_optional_public_fetch": false
+}

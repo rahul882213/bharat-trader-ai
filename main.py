@@ -4,19 +4,17 @@ Bharat Trader AI — Unified Command Line Interface
 Examples:
   python3 main.py market overview
   python3 main.py scanner daily
-  python3 main.py scanner orb
-  python3 main.py scanner volume-breakout
-  python3 main.py analyse RELIANCE
-  python3 main.py analyse ORIANA
+  python3 main.py scan-market --cap-tier "Mid Cap" --limit 30
+  python3 main.py analyse ORIANAPOWER
+  python3 main.py analyse HBLENGINEERING
+  python3 main.py analyse MAZDOCK
+  python3 main.py screener list
   python3 main.py news --symbol HAL
-  python3 main.py entry RELIANCE
-  python3 main.py exit RELIANCE
-  python3 main.py backtest --strategy orb
+  python3 main.py entry TCS
+  python3 main.py exit TCS
+  python3 main.py backtest --symbol HAL --strategy orb
   python3 main.py risk check
-  python3 main.py budget calculate
-  python3 main.py alerts check
   python3 main.py portfolio
-  python3 main.py report daily
 """
 from __future__ import annotations
 
@@ -31,14 +29,12 @@ if str(ROOT_DIR) not in sys.path:
 
 from backend.data_providers.nse_master import search_symbols
 from backend.data_providers.provider_manager import get_provider_manager
+from backend.database.stock_master_db import get_master_stats, resolve_stock, sync_stock_master
 from backend.services.indicators import compute_all_indicators
-from backend.services.workflow import load_module_fn, run_full_analysis_workflow
+from backend.services.workflow import load_module_fn, run_analysis
 
 
 def _emit(data: dict, as_json: bool = False) -> None:
-    if as_json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-        return
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
@@ -59,11 +55,32 @@ def main() -> int:
     p_scan.add_argument("--limit", type=int, default=25)
     p_scan.add_argument("--exchange", default="NSE")
 
+    # scan-market (Mode 2: Market-Wide Scanning)
+    p_mw = sub.add_parser("scan-market", help="Mode 2: Market-wide multi-factor scanner across NSE/BSE universe")
+    p_mw.add_argument("--cap-tier", default="ALL")
+    p_mw.add_argument("--sector", default="ALL")
+    p_mw.add_argument("--industry", default="ALL")
+    p_mw.add_argument("--min-mcap", type=float, default=None)
+    p_mw.add_argument("--max-mcap", type=float, default=None)
+    p_mw.add_argument("--min-price", type=float, default=None)
+    p_mw.add_argument("--max-price", type=float, default=None)
+    p_mw.add_argument("--min-volume", type=int, default=None)
+    p_mw.add_argument("--strategy", default="all")
+    p_mw.add_argument("--timeframe", default="1d")
+    p_mw.add_argument("--universe", default="all")
+    p_mw.add_argument("--limit", type=int, default=40)
+
     # analyse <SYMBOL>
-    p_ana = sub.add_parser("analyse", help="Run full technical + fundamental + news + trade plan analysis")
-    p_ana.add_argument("symbol", help="Indian NSE/BSE stock symbol (e.g. RELIANCE, ORIANA, HAL)")
+    p_ana = sub.add_parser("analyse", help="Run dynamic 12-step technical + fundamental + news + trade plan analysis")
+    p_ana.add_argument("symbol", help="Indian NSE/BSE stock symbol, BSE code, ISIN, or company name")
     p_ana.add_argument("--timeframe", default="1d")
     p_ana.add_argument("--exchange", default="NSE")
+    p_ana.add_argument("--type", dest="analysis_type", default="full", choices=["full", "technical", "fundamental"])
+
+    # screener commands
+    p_sc = sub.add_parser("screener", help="Screener.in Data Center & Stock Master operations")
+    p_sc.add_argument("action", choices=["company", "list", "screens", "stats", "sync-master"])
+    p_sc.add_argument("symbol", nargs="?", default=None)
 
     # chart <SYMBOL>
     p_chart = sub.add_parser("chart", help="Fetch OHLCV candles and indicators")
@@ -73,8 +90,14 @@ def main() -> int:
     p_chart.add_argument("--exchange", default="NSE")
 
     # search <QUERY>
-    p_search = sub.add_parser("search", help="Search NSE equity master symbols")
+    p_search = sub.add_parser("search", help="Universal search across Company Name, NSE, BSE, ISIN, Sector, Industry")
     p_search.add_argument("query")
+    p_search.add_argument("--limit", type=int, default=25)
+
+    # resolve <IDENTIFIER>
+    p_res = sub.add_parser("resolve", help="Resolve any stock identifier to canonical Stock Master record")
+    p_res.add_argument("identifier")
+    p_res.add_argument("--exchange", default="NSE")
 
     # news --symbol <SYM>
     p_news = sub.add_parser("news", help="Fetch & classify Indian market / stock news")
@@ -96,7 +119,7 @@ def main() -> int:
     p_exit.add_argument("--exchange", default="NSE")
 
     # backtest --strategy <STRAT>
-    p_bt = sub.add_parser("backtest", help="Run historical backtest + 10,000 Monte Carlo simulations")
+    p_bt = sub.add_parser("backtest", help="Run historical backtest + Monte Carlo simulations")
     p_bt.add_argument("--symbol", default="RELIANCE")
     p_bt.add_argument("--strategy", default="orb")
     p_bt.add_argument("--timeframe", default="1d")
@@ -105,7 +128,7 @@ def main() -> int:
     p_bt.add_argument("--runs", type=int, default=10000)
 
     # fundamentals <SYMBOL>
-    p_fund = sub.add_parser("fundamentals", help="Run deep Indian company fundamental analysis")
+    p_fund = sub.add_parser("fundamentals", help="Run deep Indian company fundamental analysis (Screener + Market)")
     p_fund.add_argument("symbol")
     p_fund.add_argument("--exchange", default="NSE")
     p_fund.add_argument("--no-peers", action="store_true")
@@ -149,8 +172,50 @@ def main() -> int:
         tf = args.timeframe or ("5m" if mode == "orb" else "1d")
         strat = "all" if mode == "daily" else mode
         _emit(mod.scan_market(strategy=strat, timeframe=tf, universe=args.universe, limit=args.limit, exchange=args.exchange), args.json)
+    elif args.command == "scan-market":
+        mod = load_module_fn("trader-scanner", "scanner.py")
+        _emit(
+            mod.scan_entire_market(
+                cap_tier=args.cap_tier,
+                sector=args.sector,
+                industry=args.industry,
+                min_market_cap=args.min_mcap,
+                max_market_cap=args.max_mcap,
+                min_price=args.min_price,
+                max_price=args.max_price,
+                min_volume=args.min_volume,
+                strategy=args.strategy,
+                timeframe=args.timeframe,
+                universe=args.universe,
+                limit=args.limit,
+            ),
+            args.json,
+        )
     elif args.command == "analyse":
-        _emit(run_full_analysis_workflow(args.symbol, timeframe=args.timeframe, exchange=args.exchange), args.json)
+        _emit(
+            run_analysis(
+                args.symbol,
+                exchange=args.exchange,
+                analysis_type=args.analysis_type,
+                timeframe=args.timeframe,
+            ),
+            args.json,
+        )
+    elif args.command == "screener":
+        mod = load_module_fn("trader-screener", "screener_importer.py")
+        if args.action == "company":
+            if not args.symbol:
+                _emit({"error": "symbol is required"}, args.json)
+                return 1
+            _emit(mod.get_screener_company(args.symbol), args.json)
+        elif args.action == "list":
+            _emit({"companies": mod.list_screener_companies()}, args.json)
+        elif args.action == "screens":
+            _emit({"screens": mod.list_screener_screens()}, args.json)
+        elif args.action == "stats":
+            _emit(get_master_stats(), args.json)
+        elif args.action == "sync-master":
+            _emit(sync_stock_master(force=True), args.json)
     elif args.command == "chart":
         pm = get_provider_manager()
         rng = args.range_str or ("5d" if args.timeframe == "1m" else ("1mo" if args.timeframe in {"5m", "15m", "30m"} else ("3mo" if args.timeframe == "1h" else "1y")))
@@ -159,7 +224,9 @@ def main() -> int:
             res["indicators"] = compute_all_indicators(res["candles"])
         _emit(res, args.json)
     elif args.command == "search":
-        _emit({"results": search_symbols(args.query)}, args.json)
+        _emit({"results": search_symbols(args.query, limit=args.limit)}, args.json)
+    elif args.command == "resolve":
+        _emit(resolve_stock(args.identifier, exchange=args.exchange), args.json)
     elif args.command == "news":
         mod = load_module_fn("trader-news", "news_analyst.py")
         _emit(mod.fetch_market_news(symbol=args.symbol, limit=args.limit), args.json)

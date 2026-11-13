@@ -14,6 +14,8 @@ from zoneinfo import ZoneInfo
 
 from .base import MarketDataProvider
 from .nse_master import normalize_symbol, to_yahoo_symbol
+from backend.database.db import execute_sql
+from backend.database.stock_master_db import classify_cap_tier, resolve_stock, upsert_stock_record
 
 IST = ZoneInfo("Asia/Kolkata")
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
@@ -69,37 +71,83 @@ class YahooUnofficialProvider(MarketDataProvider):
         mapped_iv, default_range = iv_map.get(interval, ("1d", "1y"))
         return mapped_iv, (range_str or default_range)
 
-    def get_candles(
-        self, symbol: str, interval: str = "1d", range_str: Optional[str] = None, exchange: str = "NSE"
-    ) -> Dict[str, Any]:
+    def _resolve_target(self, symbol: str, exchange: str) -> tuple[str, str, Optional[Dict[str, Any]]]:
+        raw = (symbol or "").strip()
+        if raw.startswith("^") or "=X" in raw or "=F" in raw:
+            return raw, raw, None
+        rec = resolve_stock(raw, exchange=exchange)
+        ysym = rec.get("effective_yahoo_symbol") or to_yahoo_symbol(raw, exchange)
+        canonical_sym = rec.get("nse_symbol") or rec.get("bse_code") or normalize_symbol(raw)
+        return canonical_sym, ysym, rec
+
+    def _fetch_chart_json(self, yahoo_sym: str, iv: str, rng: str) -> Optional[Dict[str, Any]]:
         self._throttle()
-        yahoo_sym = to_yahoo_symbol(symbol, exchange)
-        iv, rng = self._map_interval_and_range(interval, range_str)
         url = (
             f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(yahoo_sym)}"
             f"?interval={iv}&range={rng}&includePrePost=false"
         )
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+        result = (raw.get("chart") or {}).get("result")
+        if result:
+            return result[0]
+        return None
+
+    def get_candles(
+        self, symbol: str, interval: str = "1d", range_str: Optional[str] = None, exchange: str = "NSE"
+    ) -> Dict[str, Any]:
+        canonical_sym, yahoo_sym, stock_rec = self._resolve_target(symbol, exchange)
+        iv, rng = self._map_interval_and_range(interval, range_str)
         fetched_at = datetime.now(tz=IST).isoformat()
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                raw = json.loads(resp.read().decode("utf-8"))
-            result = (raw.get("chart") or {}).get("result")
-            if not result:
-                err = (raw.get("chart") or {}).get("error")
+            res = None
+            try:
+                res = self._fetch_chart_json(yahoo_sym, iv, rng)
+            except Exception:
+                res = None
+
+            # Auto-try -SM.NS or .NS/.BO if primary lookup returned nothing or <5 bars
+            if (res is None or len((res.get("timestamp") or [])) < 5) and not canonical_sym.startswith("^") and "=" not in canonical_sym:
+                fallbacks: List[str] = []
+                if yahoo_sym.endswith("-SM.NS"):
+                    fallbacks.append(f"{canonical_sym}.NS")
+                elif yahoo_sym.endswith(".NS"):
+                    fallbacks.append(f"{canonical_sym}-SM.NS")
+                    fallbacks.append(f"{canonical_sym}.BO")
+                elif yahoo_sym.endswith(".BO"):
+                    fallbacks.append(f"{canonical_sym}.NS")
+                best_len = len((res or {}).get("timestamp") or [])
+                for fb in fallbacks:
+                    try:
+                        fb_res = self._fetch_chart_json(fb, iv, rng)
+                        fb_len = len((fb_res or {}).get("timestamp") or [])
+                        if fb_res is not None and fb_len > best_len:
+                            res = fb_res
+                            best_len = fb_len
+                            yahoo_sym = fb
+                            if stock_rec and stock_rec.get("stock_id"):
+                                execute_sql(
+                                    "UPDATE stocks_master SET yahoo_symbol = ?, updated_at = ? WHERE stock_id = ?",
+                                    (fb, fetched_at, stock_rec["stock_id"]),
+                                )
+                    except Exception:
+                        continue
+
+            if not res:
                 return {
                     "available": False,
-                    "symbol": normalize_symbol(symbol),
+                    "symbol": canonical_sym,
                     "yahoo_symbol": yahoo_sym,
-                    "exchange": exchange,
+                    "exchange": (stock_rec or {}).get("exchange", exchange),
+                    "stock_meta": stock_rec,
                     "source": self.provider_label,
                     "is_unofficial": True,
                     "is_delayed": True,
                     "fetched_at_ist": fetched_at,
-                    "error": f"No data returned for {yahoo_sym}: {err}",
+                    "error": f"No market data returned for {yahoo_sym}",
                     "candles": [],
                 }
-            res = result[0]
             meta = res.get("meta", {})
             timestamps = res.get("timestamp") or []
             quote = ((res.get("indicators") or {}).get("quote") or [{}])[0]
@@ -139,11 +187,38 @@ class YahooUnofficialProvider(MarketDataProvider):
                     stale = True
                     stale_reason = f"Latest intraday bar is {int(age_sec // 3600)}h old (outside market session or delayed)."
 
+            # Cache latest daily/intraday price into central market_price_cache
+            if candles and stock_rec and stock_rec.get("stock_id"):
+                last_c = float(candles[-1]["close"])
+                prev_c = float(candles[-2]["close"]) if len(candles) >= 2 else last_c
+                chg_pct = round(((last_c - prev_c) / prev_c) * 100.0, 2) if prev_c else 0.0
+                try:
+                    execute_sql(
+                        """
+                        INSERT OR REPLACE INTO market_price_cache
+                        (stock_id, symbol, last_price, change_pct, volume, source, last_bar_ist, fetched_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            stock_rec["stock_id"],
+                            canonical_sym,
+                            last_c,
+                            chg_pct,
+                            int(candles[-1]["volume"]),
+                            self.provider_label,
+                            candles[-1]["date"],
+                            fetched_at,
+                        ),
+                    )
+                except Exception:
+                    pass
+
             return {
                 "available": len(candles) > 0,
-                "symbol": normalize_symbol(symbol) if not symbol.startswith("^") else symbol,
+                "symbol": canonical_sym,
                 "yahoo_symbol": yahoo_sym,
-                "exchange": meta.get("exchangeName", exchange),
+                "exchange": (stock_rec or {}).get("exchange") or meta.get("exchangeName", exchange),
+                "stock_meta": stock_rec,
                 "currency": meta.get("currency", "INR"),
                 "interval": interval,
                 "range": rng,
@@ -163,16 +238,17 @@ class YahooUnofficialProvider(MarketDataProvider):
                     "regularMarketVolume": meta.get("regularMarketVolume"),
                     "regularMarketDayHigh": meta.get("regularMarketDayHigh"),
                     "regularMarketDayLow": meta.get("regularMarketDayLow"),
-                    "longName": meta.get("longName") or meta.get("shortName"),
+                    "longName": (stock_rec or {}).get("company_name") or meta.get("longName") or meta.get("shortName"),
                 },
                 "candles": candles,
             }
         except Exception as exc:
             return {
                 "available": False,
-                "symbol": normalize_symbol(symbol) if not symbol.startswith("^") else symbol,
+                "symbol": canonical_sym,
                 "yahoo_symbol": yahoo_sym,
-                "exchange": exchange,
+                "exchange": (stock_rec or {}).get("exchange", exchange),
+                "stock_meta": stock_rec,
                 "source": self.provider_label,
                 "is_unofficial": True,
                 "is_delayed": True,
@@ -206,7 +282,8 @@ class YahooUnofficialProvider(MarketDataProvider):
             "symbol": data["symbol"],
             "yahoo_symbol": data["yahoo_symbol"],
             "name": meta.get("longName") or data["symbol"],
-            "exchange": exchange,
+            "exchange": data.get("exchange", exchange),
+            "stock_meta": data.get("stock_meta"),
             "currency": data.get("currency", "INR"),
             "price": round(price, 2),
             "prev_close": round(prev_day_close, 2),
@@ -225,8 +302,7 @@ class YahooUnofficialProvider(MarketDataProvider):
         }
 
     def get_fundamentals(self, symbol: str, exchange: str = "NSE") -> Dict[str, Any]:
-        self._throttle()
-        yahoo_sym = to_yahoo_symbol(symbol, exchange)
+        canonical_sym, yahoo_sym, stock_rec = self._resolve_target(symbol, exchange)
         fetched_at = datetime.now(tz=IST).isoformat()
         modules = ",".join([
             "assetProfile",
@@ -240,62 +316,74 @@ class YahooUnofficialProvider(MarketDataProvider):
             "cashflowStatementHistory",
             "earningsTrend",
         ])
-        for attempt in range(2):
-            try:
-                opener, crumb = self._ensure_crumb()
-                url = (
-                    f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
-                    f"{urllib.parse.quote(yahoo_sym)}?modules={modules}&crumb={urllib.parse.quote(crumb)}"
-                )
-                raw = json.loads(opener.open(url, timeout=10).read().decode("utf-8"))
-                res_list = (raw.get("quoteSummary") or {}).get("result")
-                if not res_list:
+        candidates = [yahoo_sym]
+        if yahoo_sym.endswith(".NS") and "-SM.NS" not in yahoo_sym:
+            candidates.append(f"{canonical_sym}-SM.NS")
+
+        last_error = "No fundamental data available"
+        for cand_sym in candidates:
+            for attempt in range(2):
+                try:
+                    self._throttle()
+                    opener, crumb = self._ensure_crumb()
+                    url = (
+                        f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+                        f"{urllib.parse.quote(cand_sym)}?modules={modules}&crumb={urllib.parse.quote(crumb)}"
+                    )
+                    raw = json.loads(opener.open(url, timeout=10).read().decode("utf-8"))
+                    res_list = (raw.get("quoteSummary") or {}).get("result")
+                    if not res_list:
+                        last_error = f"No fundamental data available for {cand_sym}"
+                        break
+
+                    raw_obj = res_list[0]
+                    # Enrich central stocks_master with real market cap, cap tier, sector & industry
+                    if stock_rec:
+                        sd = raw_obj.get("summaryDetail") or {}
+                        prof = raw_obj.get("assetProfile") or {}
+                        mc_raw = (sd.get("marketCap") or {}).get("raw")
+                        mc_cr = round(float(mc_raw) / 1e7, 2) if isinstance(mc_raw, (int, float)) and mc_raw > 0 else None
+                        upsert_stock_record({
+                            "isin": stock_rec.get("isin"),
+                            "nse_symbol": stock_rec.get("nse_symbol"),
+                            "bse_code": stock_rec.get("bse_code"),
+                            "sector": prof.get("sector") or stock_rec.get("sector"),
+                            "industry": prof.get("industry") or stock_rec.get("industry"),
+                            "market_cap_cr": mc_cr,
+                            "cap_tier": classify_cap_tier(mc_cr) if mc_cr else stock_rec.get("cap_tier"),
+                        })
+                        stock_rec = resolve_stock(stock_rec.get("stock_id") or canonical_sym, exchange=exchange)
+
                     return {
-                        "available": False,
-                        "symbol": normalize_symbol(symbol),
-                        "yahoo_symbol": yahoo_sym,
+                        "available": True,
+                        "symbol": canonical_sym,
+                        "yahoo_symbol": cand_sym,
+                        "exchange": (stock_rec or {}).get("exchange", exchange),
+                        "stock_meta": stock_rec,
                         "source": self.provider_label,
                         "is_unofficial": True,
                         "fetched_at_ist": fetched_at,
-                        "error": f"No fundamental data available for {yahoo_sym}",
+                        "raw": raw_obj,
                     }
-                return {
-                    "available": True,
-                    "symbol": normalize_symbol(symbol),
-                    "yahoo_symbol": yahoo_sym,
-                    "exchange": exchange,
-                    "source": self.provider_label,
-                    "is_unofficial": True,
-                    "fetched_at_ist": fetched_at,
-                    "raw": res_list[0],
-                }
-            except urllib.error.HTTPError as e:
-                if e.code in (401, 403) and attempt == 0:
-                    self._crumb = None
-                    self._opener = None
-                    continue
-                return {
-                    "available": False,
-                    "symbol": normalize_symbol(symbol),
-                    "yahoo_symbol": yahoo_sym,
-                    "source": self.provider_label,
-                    "is_unofficial": True,
-                    "fetched_at_ist": fetched_at,
-                    "error": f"HTTP {e.code}: {e.reason}",
-                }
-            except Exception as exc:
-                return {
-                    "available": False,
-                    "symbol": normalize_symbol(symbol),
-                    "yahoo_symbol": yahoo_sym,
-                    "source": self.provider_label,
-                    "is_unofficial": True,
-                    "fetched_at_ist": fetched_at,
-                    "error": str(exc),
-                }
+                except urllib.error.HTTPError as e:
+                    if e.code in (401, 403) and attempt == 0:
+                        self._crumb = None
+                        self._opener = None
+                        continue
+                    last_error = f"HTTP {e.code}: {e.reason}"
+                    break
+                except Exception as exc:
+                    last_error = str(exc)
+                    break
+
         return {
             "available": False,
-            "symbol": normalize_symbol(symbol),
+            "symbol": canonical_sym,
+            "yahoo_symbol": yahoo_sym,
+            "stock_meta": stock_rec,
             "source": self.provider_label,
-            "error": "Failed after retry",
+            "is_unofficial": True,
+            "fetched_at_ist": fetched_at,
+            "error": last_error,
         }
+

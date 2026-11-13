@@ -177,16 +177,30 @@ export const TechnicalSection: React.FC<Props> = ({ symbol, exchange, onChangeEx
       ? 'text-rose-400'
       : 'text-slate-300';
 
+  const sm = chartData?.stock_meta || {};
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-xl font-bold text-slate-100">
-            {symbol} ({exchange}) — Technicals, Entry & Exit Desk
+            {sm.company_name || chartData?.meta?.longName || symbol} ({chartData?.symbol || symbol} · {sm.exchange || exchange}) — Technicals & Entry/Exit
           </h1>
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
-            <span>{chartData?.meta?.longName || symbol}</span>
+            {sm.isin && <span className="font-mono">ISIN: {sm.isin}</span>}
+            {sm.bse_code && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono">BSE: {sm.bse_code}</span>
+              </>
+            )}
+            {sm.sector && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{sm.sector}</span>
+              </>
+            )}
             <span aria-hidden="true">·</span>
             <span>Source: {chartData?.source || 'Yahoo Finance (Unofficial)'}</span>
             {chartData?.is_delayed && (

@@ -12,7 +12,17 @@ const execFileAsync = promisify(execFile);
 const ROOT_DIR = process.cwd();
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use('/api', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 
 // Simple in-memory TTL cache to respect external rate limits on heavy universe calls
 const apiCache = new Map<string, { ts: number; data: unknown }>();
@@ -103,12 +113,80 @@ app.get('/api/report/daily', async (_req, res) => {
   }
 });
 
-// --- SYMBOL SEARCH & WATCHLIST ---
+// --- UNIVERSAL STOCK MASTER SEARCH & RESOLUTION ---
+app.get('/api/stocks/master/stats', async (_req, res) => {
+  try {
+    const cached = getCached('master_stats', 60_000);
+    if (cached) return res.json(cached);
+    const data = await runPythonCli(['screener', 'stats']);
+    setCached('master_stats', data);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/stocks/resolve/:query', async (req, res) => {
+  try {
+    const q = String(req.params.query || '').trim();
+    const exchange = String(req.query.exchange || 'NSE');
+    const data = await runPythonCli(['resolve', q, '--exchange', exchange]);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/symbols/search', async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
-    if (!q) return res.json({ results: [] });
-    const data = await runPythonCli(['search', q]);
+    const sector = String(req.query.sector || 'ALL');
+    const industry = String(req.query.industry || 'ALL');
+    const capTier = String(req.query.cap_tier || 'ALL');
+    const exchange = String(req.query.exchange || 'ALL');
+    const limit = Number(req.query.limit || 25);
+
+    const data = await runPythonSnippet(
+      `
+import json, sys
+from backend.database.stock_master_db import search_stock_master, resolve_stock
+p = json.loads(sys.argv[1])
+rows = search_stock_master(
+    query=p["q"],
+    sector=p["sector"],
+    industry=p["industry"],
+    cap_tier=p["cap_tier"],
+    exchange=p["exchange"],
+    limit=p["limit"],
+)
+# If user typed a specific stock symbol/name not matched locally, run dynamic discovery
+if not rows and len(p["q"]) >= 2:
+    rec = resolve_stock(p["q"])
+    if rec and rec.get("trading_status") != "UNVERIFIED":
+        rows = [rec]
+out = [
+    {
+        "stock_id": r.get("stock_id"),
+        "symbol": r.get("nse_symbol") or r.get("bse_code") or r.get("stock_id"),
+        "nse_symbol": r.get("nse_symbol"),
+        "bse_code": r.get("bse_code"),
+        "name": r.get("company_name"),
+        "company_name": r.get("company_name"),
+        "series": r.get("series") or "EQ",
+        "isin": r.get("isin") or "",
+        "exchange": r.get("exchange") or "NSE",
+        "sector": r.get("sector") or "Indian Equities",
+        "industry": r.get("industry") or "Indian Listed Equity",
+        "market_cap_cr": r.get("market_cap_cr"),
+        "cap_tier": r.get("cap_tier"),
+        "screener_url": r.get("screener_url"),
+    }
+    for r in rows
+]
+print(json.dumps({"results": out}))
+      `,
+      { q, sector, industry, cap_tier: capTier, exchange, limit }
+    );
     res.json(data);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -174,6 +252,53 @@ app.get('/api/scanner', async (req, res) => {
   }
 });
 
+// --- MODE 2: MARKET-WIDE MULTI-FACTOR SCANNER ---
+app.get('/api/scanner/market-wide', async (req, res) => {
+  try {
+    const capTier = String(req.query.cap_tier || 'ALL');
+    const sector = String(req.query.sector || 'ALL');
+    const industry = String(req.query.industry || 'ALL');
+    const strategy = String(req.query.strategy || 'all');
+    const timeframe = String(req.query.timeframe || '1d');
+    const universe = String(req.query.universe || 'all');
+    const limit = String(req.query.limit || '40');
+
+    const args = [
+      'scan-market',
+      '--cap-tier',
+      capTier,
+      '--sector',
+      sector,
+      '--industry',
+      industry,
+      '--strategy',
+      strategy,
+      '--timeframe',
+      timeframe,
+      '--universe',
+      universe,
+      '--limit',
+      limit,
+    ];
+    if (req.query.min_mcap) args.push('--min-mcap', String(req.query.min_mcap));
+    if (req.query.max_mcap) args.push('--max-mcap', String(req.query.max_mcap));
+    if (req.query.min_price) args.push('--min-price', String(req.query.min_price));
+    if (req.query.max_price) args.push('--max-price', String(req.query.max_price));
+    if (req.query.min_volume) args.push('--min-volume', String(req.query.min_volume));
+
+    const cacheKey = `mw:${args.join(':')}`;
+    if (req.query.refresh !== '1') {
+      const cached = getCached(cacheKey, 45_000);
+      if (cached) return res.json(cached);
+    }
+    const data = await runPythonCli(args, 90000);
+    setCached(cacheKey, data);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Market-wide scan failed' });
+  }
+});
+
 // --- CHART & TECHNICALS ---
 app.get('/api/chart/:symbol', async (req, res) => {
   try {
@@ -218,13 +343,31 @@ app.get('/api/exit/:symbol', async (req, res) => {
   }
 });
 
-// --- FULL 12-STEP WORKFLOW ---
+// --- DYNAMIC 12-STEP WORKFLOW (run_analysis) ---
 app.get('/api/workflow/:symbol', async (req, res) => {
   try {
     const symbol = String(req.params.symbol).toUpperCase();
     const timeframe = String(req.query.timeframe || '1d');
     const exchange = String(req.query.exchange || 'NSE');
-    const data = await runPythonCli(['analyse', symbol, '--timeframe', timeframe, '--exchange', exchange], 60000);
+    const analysisType = String(req.query.type || 'full');
+    const data = await runPythonCli(
+      ['analyse', symbol, '--timeframe', timeframe, '--exchange', exchange, '--type', analysisType],
+      90000
+    );
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/workflow/run', async (req, res) => {
+  try {
+    const { symbol, exchange = 'NSE', analysis_type = 'full', timeframe = '1d' } = req.body || {};
+    if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
+    const data = await runPythonCli(
+      ['analyse', String(symbol).toUpperCase(), '--timeframe', String(timeframe), '--exchange', String(exchange), '--type', String(analysis_type)],
+      90000
+    );
     res.json(data);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -243,6 +386,175 @@ app.get('/api/fundamentals/:symbol', async (req, res) => {
     }
     const data = await runPythonCli(['fundamentals', symbol, '--exchange', exchange]);
     setCached(cacheKey, data);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- SCREENER.IN DATA CENTER INTEGRATION ---
+app.get('/api/screener/companies', async (_req, res) => {
+  try {
+    const data = await runPythonCli(['screener', 'list']);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/screener/screens', async (_req, res) => {
+  try {
+    const data = await runPythonCli(['screener', 'screens']);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/screener/template-csv', async (_req, res) => {
+  try {
+    const data = await runPythonSnippet(
+      `
+import json
+from backend.services.workflow import load_module_fn
+mod = load_module_fn("trader-screener", "screener_importer.py")
+print(json.dumps({"csv": mod.get_sample_csv_template()}))
+      `,
+      {}
+    );
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/screener/company/:symbol', async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol).toUpperCase();
+    const data = await runPythonCli(['screener', 'company', symbol]);
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/screener/import-csv', async (req, res) => {
+  try {
+    const { csv_text, filename = 'screener_export.csv', screen_name, screener_url, statement_scope = 'Consolidated', update_existing = true } = req.body || {};
+    if (!csv_text) return res.status(400).json({ error: 'csv_text is required' });
+    const data = await runPythonSnippet(
+      `
+import json, sys
+from backend.services.workflow import load_module_fn
+mod = load_module_fn("trader-screener", "screener_importer.py")
+p = json.loads(sys.argv[1])
+res = mod.import_screener_csv(
+    csv_text=p["csv_text"],
+    filename=p.get("filename", "screener_export.csv"),
+    screen_name=p.get("screen_name"),
+    screener_url=p.get("screener_url"),
+    statement_scope=p.get("statement_scope", "Consolidated"),
+    update_existing=bool(p.get("update_existing", True)),
+)
+print(json.dumps(res))
+      `,
+      { csv_text, filename, screen_name, screener_url, statement_scope, update_existing }
+    );
+    apiCache.clear();
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/screener/import-xlsx', async (req, res) => {
+  try {
+    const { content_base64, filename = 'screener_company.xlsx', symbol_hint, screener_url, statement_scope = 'Consolidated', update_existing = true } = req.body || {};
+    if (!content_base64) return res.status(400).json({ error: 'content_base64 is required' });
+    const rawB64 = String(content_base64).includes(',') ? String(content_base64).split(',')[1] : String(content_base64);
+    const data = await runPythonSnippet(
+      `
+import base64, json, sys
+from backend.services.workflow import load_module_fn
+mod = load_module_fn("trader-screener", "screener_importer.py")
+p = json.loads(sys.argv[1])
+xlsx_bytes = base64.b64decode(p["raw_b64"])
+res = mod.import_screener_xlsx(
+    xlsx_bytes=xlsx_bytes,
+    filename=p.get("filename", "screener_company.xlsx"),
+    symbol_hint=p.get("symbol_hint"),
+    screener_url=p.get("screener_url"),
+    statement_scope=p.get("statement_scope", "Consolidated"),
+    update_existing=bool(p.get("update_existing", True)),
+)
+print(json.dumps(res))
+      `,
+      { raw_b64: rawB64, filename, symbol_hint, screener_url, statement_scope, update_existing }
+    );
+    apiCache.clear();
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/screener/associate-url', async (req, res) => {
+  try {
+    const { symbol, screener_url, statement_scope } = req.body || {};
+    if (!symbol || !screener_url) return res.status(400).json({ error: 'symbol and screener_url are required' });
+    const data = await runPythonSnippet(
+      `
+import json, sys
+from backend.services.workflow import load_module_fn
+mod = load_module_fn("trader-screener", "screener_importer.py")
+p = json.loads(sys.argv[1])
+print(json.dumps(mod.associate_screener_url(p["symbol"], p["screener_url"], p.get("statement_scope"))))
+      `,
+      { symbol, screener_url, statement_scope }
+    );
+    apiCache.clear();
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/screener/business-notes', async (req, res) => {
+  try {
+    const { symbol, notes } = req.body || {};
+    if (!symbol || !notes) return res.status(400).json({ error: 'symbol and notes are required' });
+    const data = await runPythonSnippet(
+      `
+import json, sys
+from backend.services.workflow import load_module_fn
+mod = load_module_fn("trader-screener", "screener_importer.py")
+p = json.loads(sys.argv[1])
+print(json.dumps(mod.update_business_notes(p["symbol"], p["notes"])))
+      `,
+      { symbol, notes }
+    );
+    apiCache.clear();
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/screener/optional-public-fetch', async (req, res) => {
+  try {
+    const { symbol, statement_scope = 'Consolidated' } = req.body || {};
+    if (!symbol) return res.status(400).json({ error: 'symbol is required' });
+    const data = await runPythonSnippet(
+      `
+import json, sys
+from backend.services.workflow import load_module_fn
+adapter_mod = load_module_fn("trader-screener", "provider_adapter.py")
+p = json.loads(sys.argv[1])
+res = adapter_mod.ScreenerPublicPageAdapter().fetch_company(p["symbol"], statement_scope=p.get("statement_scope", "Consolidated"))
+print(json.dumps(res))
+      `,
+      { symbol, statement_scope }
+    );
     res.json(data);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

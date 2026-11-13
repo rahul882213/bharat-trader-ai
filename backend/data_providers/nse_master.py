@@ -242,15 +242,41 @@ def get_universe_symbols(universe: str = "nifty50", limit: int = 50) -> List[str
     return syms[:limit] if limit > 0 else syms
 
 
-def search_symbols(query: str, limit: int = 20) -> List[Dict[str, str]]:
-    q = query.strip().upper()
+def search_symbols(query: str, limit: int = 25) -> List[Dict[str, Any]]:
+    q = query.strip()
     if not q:
         return []
-    master = fetch_nse_equity_master()
-    matches: List[Dict[str, str]] = []
-    for eq in master.get("equities", []):
-        if q in eq["symbol"].upper() or q in eq["name"].upper():
-            matches.append(eq)
-            if len(matches) >= limit:
-                break
-    return matches
+    try:
+        from backend.database.stock_master_db import search_stock_master
+        rows = search_stock_master(query=q, limit=limit)
+        return [
+            {
+                "stock_id": r.get("stock_id"),
+                "symbol": r.get("nse_symbol") or r.get("bse_code") or r.get("stock_id"),
+                "nse_symbol": r.get("nse_symbol"),
+                "bse_code": r.get("bse_code"),
+                "name": r.get("company_name"),
+                "company_name": r.get("company_name"),
+                "series": r.get("series") or "EQ",
+                "isin": r.get("isin") or "",
+                "exchange": r.get("exchange") or "NSE",
+                "sector": r.get("sector") or "Indian Equities",
+                "industry": r.get("industry") or "Indian Listed Equity",
+                "market_cap_cr": r.get("market_cap_cr"),
+                "cap_tier": r.get("cap_tier"),
+                "trading_status": r.get("trading_status") or "ACTIVE",
+                "screener_url": r.get("screener_url"),
+            }
+            for r in rows
+        ]
+    except Exception:
+        qu = q.upper()
+        master = fetch_nse_equity_master()
+        matches: List[Dict[str, Any]] = []
+        for eq in master.get("equities", []):
+            if qu in eq["symbol"].upper() or qu in eq["name"].upper() or qu in eq.get("isin", "").upper():
+                matches.append(eq)
+                if len(matches) >= limit:
+                    break
+        return matches
+

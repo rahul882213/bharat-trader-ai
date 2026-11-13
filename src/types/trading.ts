@@ -1,6 +1,7 @@
 export type NavSection =
   | 'overview'
   | 'scanner'
+  | 'screener'
   | 'technical'
   | 'fundamental'
   | 'news'
@@ -20,12 +21,20 @@ export interface CandleBar {
 }
 
 export interface SearchSymbolResult {
+  stock_id?: string;
   symbol: string;
+  nse_symbol?: string;
+  bse_code?: string;
   name: string;
+  company_name?: string;
   series: string;
   isin: string;
   exchange: string;
   sector: string;
+  industry?: string;
+  market_cap_cr?: number | null;
+  cap_tier?: string | null;
+  screener_url?: string | null;
 }
 
 export interface RiskConfig {

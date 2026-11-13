@@ -5,7 +5,9 @@ import {
   Bell,
   Briefcase,
   CandlestickChart,
+  Database,
   FileSpreadsheet,
+  Globe,
   Newspaper,
   Radar,
   Search,
@@ -15,6 +17,7 @@ import {
 import type { NavSection, SearchSymbolResult } from './types/trading';
 import { OverviewSection } from './components/OverviewSection';
 import { ScannerSection } from './components/ScannerSection';
+import { ScreenerSection } from './components/ScreenerSection';
 import { TechnicalSection } from './components/TechnicalSection';
 import { FundamentalSection } from './components/FundamentalSection';
 import { NewsSection } from './components/NewsSection';
@@ -22,35 +25,67 @@ import { BacktestSection } from './components/BacktestSection';
 import { PortfolioRiskSection } from './components/PortfolioRiskSection';
 import { AlertsSettingsSection } from './components/AlertsSettingsSection';
 import { formatINR } from './utils/formatters';
+import { getBackendBaseUrl, getIsStaticMode, setBackendBaseUrl } from './utils/apiBridge';
 
 const NAV_ITEMS: { id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Market Overview', icon: Activity },
-  { id: 'scanner', label: 'AI Stock Scanner', icon: Radar },
-  { id: 'technical', label: 'Technicals & Entry/Exit', icon: CandlestickChart },
-  { id: 'fundamental', label: 'Fundamental Analyst', icon: FileSpreadsheet },
+  { id: 'scanner', label: 'Scanner & AI Rankings', icon: Radar },
+  { id: 'screener', label: 'Screener.in Data Center', icon: Database },
+  { id: 'technical', label: 'Analyse Any Stock (Tech)', icon: CandlestickChart },
+  { id: 'fundamental', label: 'Fundamental Analysis', icon: FileSpreadsheet },
   { id: 'news', label: 'News & Filings', icon: Newspaper },
   { id: 'backtest', label: 'Backtesting Engine', icon: BarChart3 },
-  { id: 'portfolio', label: 'Portfolio & Risk', icon: Briefcase },
+  { id: 'portfolio', label: 'Portfolio Analysis & Risk', icon: Briefcase },
   { id: 'alerts', label: 'Alerts & Settings', icon: Bell },
 ];
 
-const QUICK_WATCHLIST = ['RELIANCE', 'TCS', 'HDFCBANK', 'HAL', 'TATAMOTORS', 'INFY', 'SBIN', 'ORIANA'];
+const QUICK_WATCHLIST = ['HAL', 'MAZDOCK', 'ORIANA', 'HBLENGINE', 'TCS', 'HDFCBANK', 'RELIANCE', 'HINDCOPPER'];
 
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavSection>('overview');
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('RELIANCE');
+  const [scannerInitialMode, setScannerInitialMode] = useState<'technical' | 'market_wide'>('technical');
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('HAL');
+  const [selectedCompanyName, setSelectedCompanyName] = useState<string>('Hindustan Aeronautics Limited');
   const [exchange, setExchange] = useState<'NSE' | 'BSE'>('NSE');
 
-  // Symbol Search
+  // Global Universal Stock Search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchSymbolResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // 12-Step Automated Workflow Modal
+  // Dynamic 12-Step Workflow Modal
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
   const [workflowData, setWorkflowData] = useState<any>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
+
+  // Static GitHub Pages mode notice + optional backend URL connector
+  const [staticMode, setStaticMode] = useState<boolean>(() => getIsStaticMode());
+  const [backendUrlInput, setBackendUrlInput] = useState<string>(() => getBackendBaseUrl() || 'http://localhost:3000');
+
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent<boolean>).detail;
+      setStaticMode(Boolean(detail));
+    };
+    window.addEventListener('bharat-trader-static-mode', handler);
+    return () => window.removeEventListener('bharat-trader-static-mode', handler);
+  }, []);
+
+  // Sync canonical metadata whenever selectedSymbol changes
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/stocks/resolve/${encodeURIComponent(selectedSymbol)}?exchange=${exchange}`)
+      .then((r) => r.json())
+      .then((rec) => {
+        if (!active || !rec) return;
+        if (rec.company_name) setSelectedCompanyName(rec.company_name);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [selectedSymbol, exchange]);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -60,44 +95,73 @@ export default function App() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/symbols/search?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`/api/symbols/search?q=${encodeURIComponent(q)}&limit=25`);
         const json = await res.json();
         setSearchResults(json.results || []);
         setSearchOpen(true);
       } catch {
         setSearchResults([]);
       }
-    }, 220);
+    }, 200);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleSelectSymbol = (sym: string, targetTab: NavSection = 'technical') => {
+  const handleSelectSymbol = (sym: string, targetTab: NavSection = 'technical', companyName?: string) => {
     setSelectedSymbol(sym.toUpperCase());
+    if (companyName) setSelectedCompanyName(companyName);
     setActiveNav(targetTab);
     setSearchOpen(false);
     setSearchQuery('');
   };
 
-  const runFullWorkflow = async () => {
+  const handleSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    if (searchResults.length > 0) {
+      const top = searchResults[0];
+      handleSelectSymbol(top.symbol, activeNav === 'overview' ? 'technical' : activeNav, top.name);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/stocks/resolve/${encodeURIComponent(q)}`);
+      const rec = await res.json();
+      const sym = rec.nse_symbol || rec.bse_code || q.toUpperCase();
+      handleSelectSymbol(sym, activeNav === 'overview' ? 'technical' : activeNav, rec.company_name);
+    } catch {
+      handleSelectSymbol(q.toUpperCase());
+    }
+  };
+
+  const runAiAnalysis = async () => {
     setWorkflowOpen(true);
     setWorkflowLoading(true);
     setWorkflowError(null);
     try {
-      const res = await fetch(`/api/workflow/${encodeURIComponent(selectedSymbol)}?exchange=${exchange}`);
+      const res = await fetch('/api/workflow/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: selectedSymbol, exchange, analysis_type: 'full', timeframe: '1d' }),
+      });
       const json = await res.json();
-      if (!json.available) throw new Error(json.error || 'Workflow execution failed');
+      if (!json.available) throw new Error(json.error || `Workflow execution failed for ${selectedSymbol}`);
       setWorkflowData(json);
     } catch (e: any) {
-      setWorkflowError(e.message || 'Workflow execution failed');
+      setWorkflowError(e.message || 'AI Analysis failed');
     } finally {
       setWorkflowLoading(false);
     }
   };
 
+  const openMarketWideScan = () => {
+    setScannerInitialMode('market_wide');
+    setActiveNav('scanner');
+  };
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-200 flex flex-col">
-      {/* Top Bar Contract: Brand Wordmark — Symbol Search — Primary CTA */}
-      <header className="sticky top-0 z-30 h-14 px-5 border-b border-slate-800 bg-[#0b101b]/95 backdrop-blur flex items-center justify-between gap-6">
+      {/* Top Bar: Brand — Global Universal Stock Search — Selected Stock + Run AI Analysis & Market-Wide Scan */}
+      <header className="sticky top-0 z-30 h-14 px-4 md:px-5 border-b border-slate-800 bg-[#0b101b]/95 backdrop-blur flex items-center justify-between gap-4">
         <button
           type="button"
           onClick={() => setActiveNav('overview')}
@@ -106,7 +170,7 @@ export default function App() {
           Bharat Trader AI
         </button>
 
-        <div className="relative flex-1 max-w-md">
+        <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-lg">
           <div className="flex items-center bg-[#0f1626] border border-slate-700/80 rounded px-3 py-1.5">
             <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <input
@@ -114,39 +178,103 @@ export default function App() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchResults.length && setSearchOpen(true)}
-              placeholder={`Search NSE/BSE stock (Active: ${selectedSymbol})...`}
+              placeholder="Search Company, NSE, BSE, ISIN, Sector, Industry (e.g. ORIANAPOWER, HBLENGINEERING, HAL)..."
               className="w-full bg-transparent text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none"
             />
           </div>
           {searchOpen && searchResults.length > 0 && (
-            <div className="absolute left-0 right-0 mt-1 bg-[#0f1626] border border-slate-700 rounded-md shadow-2xl max-h-72 overflow-y-auto z-50">
+            <div className="absolute left-0 right-0 mt-1 bg-[#0f1626] border border-slate-700 rounded-md shadow-2xl max-h-80 overflow-y-auto z-50">
               {searchResults.map((item) => (
                 <button
-                  key={item.symbol}
+                  key={item.stock_id || item.symbol}
                   type="button"
-                  onClick={() => handleSelectSymbol(item.symbol)}
-                  className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center justify-between text-xs border-b border-slate-800/50"
+                  onClick={() =>
+                    handleSelectSymbol(
+                      item.symbol,
+                      activeNav === 'overview' ? 'technical' : activeNav,
+                      item.company_name || item.name
+                    )
+                  }
+                  className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center justify-between gap-3 text-xs border-b border-slate-800/50"
                 >
-                  <div>
-                    <span className="font-mono font-semibold text-slate-100">{item.symbol}</span>
-                    <span className="text-slate-400 ml-2 truncate">{item.name}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-semibold text-amber-300">{item.symbol}</span>
+                      {item.bse_code && <span className="font-mono text-[10px] text-slate-500">BSE:{item.bse_code}</span>}
+                      <span className="text-slate-200 truncate">{item.company_name || item.name}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">
+                      {item.isin ? `ISIN ${item.isin} · ` : ''}
+                      {item.industry || item.sector}
+                    </div>
                   </div>
-                  <span className="text-[11px] text-slate-500">{item.sector}</span>
+                  <div className="text-right shrink-0">
+                    <div className="text-[11px] text-slate-400">{item.sector}</div>
+                    {item.cap_tier && <div className="text-[10px] text-slate-500">{item.cap_tier}</div>}
+                  </div>
                 </button>
               ))}
             </div>
           )}
-        </div>
+        </form>
 
-        <button
-          type="button"
-          onClick={runFullWorkflow}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-amber-400 text-slate-950 rounded hover:bg-amber-300 whitespace-nowrap shrink-0"
-        >
-          <Workflow className="w-3.5 h-3.5" />
-          Run 12-Step Workflow ({selectedSymbol})
-        </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="hidden lg:flex flex-col text-right pr-2 border-r border-slate-800">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Selected Stock</span>
+            <span className="text-xs font-mono font-semibold text-slate-100 max-w-[180px] truncate" title={selectedCompanyName}>
+              {selectedSymbol} · {selectedCompanyName}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={openMarketWideScan}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-[#131b2e] border border-slate-700 text-slate-200 rounded hover:bg-slate-800 whitespace-nowrap"
+          >
+            <Globe className="w-3.5 h-3.5 text-sky-400" />
+            Scan Entire Market
+          </button>
+
+          <button
+            type="button"
+            onClick={runAiAnalysis}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-amber-400 text-slate-950 rounded hover:bg-amber-300 whitespace-nowrap"
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            Run AI Analysis
+          </button>
+        </div>
       </header>
+
+      {staticMode && (
+        <div className="px-4 md:px-5 py-2 bg-[#11192b] border-b border-amber-500/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="text-slate-300">
+            <span className="font-semibold text-amber-300">Static GitHub Pages Mode:</span> Universal Stock Search across 2,636+ NSE/BSE equities is active. Connect a running Bharat Trader AI backend (<code className="font-mono text-slate-200">npm run dev</code>) for live Yahoo/NSE feeds, Screener DB persistence &amp; 12-Step AI Analysis.
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setBackendBaseUrl(backendUrlInput);
+              window.location.reload();
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="url"
+              value={backendUrlInput}
+              onChange={(e) => setBackendUrlInput(e.target.value)}
+              placeholder="http://localhost:3000"
+              className="w-52 bg-[#090d16] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-400"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1 bg-amber-400 text-slate-950 font-semibold rounded hover:bg-amber-300"
+            >
+              Connect Backend
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0">
         {/* Left Institutional Sidebar */}
@@ -160,7 +288,10 @@ export default function App() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setActiveNav(item.id)}
+                    onClick={() => {
+                      if (item.id === 'scanner') setScannerInitialMode('technical');
+                      setActiveNav(item.id);
+                    }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
                       active
                         ? 'bg-slate-800 text-slate-100'
@@ -175,7 +306,7 @@ export default function App() {
             </nav>
 
             <div className="pt-4 border-t border-slate-800">
-              <div className="px-3 text-[11px] font-medium text-slate-500 mb-2">Quick NSE Watchlist</div>
+              <div className="px-3 text-[11px] font-medium text-slate-500 mb-2">Quick Stock Switcher</div>
               <div className="space-y-0.5">
                 {QUICK_WATCHLIST.map((sym) => (
                   <button
@@ -225,11 +356,28 @@ export default function App() {
         {/* Main Viewport */}
         <main className="flex-1 min-w-0 p-5 md:p-7 pb-20 md:pb-8 overflow-y-auto">
           {activeNav === 'overview' && <OverviewSection onSelectSymbol={(s) => handleSelectSymbol(s, 'technical')} />}
-          {activeNav === 'scanner' && <ScannerSection onSelectSymbol={(s) => handleSelectSymbol(s, 'technical')} />}
+          {activeNav === 'scanner' && (
+            <ScannerSection
+              initialMode={scannerInitialMode}
+              onSelectSymbol={(s) => handleSelectSymbol(s, 'technical')}
+            />
+          )}
+          {activeNav === 'screener' && (
+            <ScreenerSection
+              symbol={selectedSymbol}
+              onSelectSymbol={(s, tab) => handleSelectSymbol(s, tab || 'screener')}
+            />
+          )}
           {activeNav === 'technical' && (
             <TechnicalSection symbol={selectedSymbol} exchange={exchange} onChangeExchange={setExchange} />
           )}
-          {activeNav === 'fundamental' && <FundamentalSection symbol={selectedSymbol} exchange={exchange} />}
+          {activeNav === 'fundamental' && (
+            <FundamentalSection
+              symbol={selectedSymbol}
+              exchange={exchange}
+              onOpenScreener={() => setActiveNav('screener')}
+            />
+          )}
           {activeNav === 'news' && <NewsSection symbol={selectedSymbol} />}
           {activeNav === 'backtest' && <BacktestSection symbol={selectedSymbol} />}
           {activeNav === 'portfolio' && <PortfolioRiskSection />}
@@ -237,13 +385,13 @@ export default function App() {
         </main>
       </div>
 
-      {/* 12-Step Automated Workflow Result Modal */}
+      {/* Dynamic 12-Step AI Analysis Result Modal */}
       {workflowOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="w-full max-w-3xl max-h-[85vh] bg-[#0f1626] border border-slate-700 rounded-lg flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800">
               <div className="font-display font-semibold text-sm text-slate-100">
-                12-Step Connected AI Workflow — {selectedSymbol} ({exchange})
+                12-Step AI Analysis — {selectedCompanyName} ({selectedSymbol} · {exchange})
               </div>
               <button
                 type="button"
@@ -256,12 +404,30 @@ export default function App() {
             <div className="p-5 overflow-y-auto space-y-4 text-xs">
               {workflowLoading ? (
                 <div className="py-12 text-center text-slate-400">
-                  Executing Scanner → News → Technicals → Entry → Exit → Backtest → Sizing → Risk Gate...
+                  Executing Stock Resolution → Screener & Market Fundamentals → News → Technicals → Entry → Exit → Backtest → Risk Gate for {selectedSymbol}...
                 </div>
               ) : workflowError ? (
                 <div className="p-4 bg-rose-950/40 border border-rose-800 rounded text-rose-200">{workflowError}</div>
               ) : workflowData ? (
                 <>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                    <span className="font-mono text-slate-200">{workflowData.stock_meta?.company_name}</span>
+                    {workflowData.stock_meta?.isin && (
+                      <>
+                        <span>·</span>
+                        <span className="font-mono">ISIN {workflowData.stock_meta.isin}</span>
+                      </>
+                    )}
+                    <span>·</span>
+                    <span>{workflowData.stock_meta?.sector}</span>
+                    {workflowData.stock_meta?.cap_tier && (
+                      <>
+                        <span>·</span>
+                        <span>{workflowData.stock_meta.cap_tier}</span>
+                      </>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
                     <div className="p-3 bg-[#0a0f1c] border border-slate-800 rounded">
                       <div className="text-slate-400 font-sans">Entry Status</div>
@@ -296,8 +462,28 @@ export default function App() {
                     </div>
                   </div>
 
+                  {workflowData.analysis?.fundamental?.scores && (
+                    <div className="p-4 bg-[#0a0f1c] border border-slate-800 rounded space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-200">AI Fundamental Scores</span>
+                        <span className="font-mono text-amber-300">
+                          Composite {workflowData.analysis.fundamental.scores.composite_score}/100
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
+                        <div>Quality: {workflowData.analysis.fundamental.scores.business_quality?.score}/100</div>
+                        <div>Strength: {workflowData.analysis.fundamental.scores.financial_strength?.score}/100</div>
+                        <div>Growth: {workflowData.analysis.fundamental.scores.growth?.score}/100</div>
+                        <div>Valuation: {workflowData.analysis.fundamental.scores.valuation?.score}/100</div>
+                      </div>
+                      <p className="text-slate-300 leading-relaxed">
+                        {workflowData.analysis.fundamental.final_assessment}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-[#0a0f1c] border border-slate-800 rounded space-y-2">
-                    <div className="font-semibold text-slate-200">Pipeline Summary</div>
+                    <div className="font-semibold text-slate-200">Technical & Trade Pipeline Summary</div>
                     <div className="text-slate-300">{workflowData.trade_plan?.entry?.summary}</div>
                     <div className="text-slate-400">
                       News Sentiment: {workflowData.analysis?.news?.overall_sentiment} (
@@ -312,8 +498,30 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="text-[11px] text-slate-400">
-                    Structured JSON outputs saved to trader/analysis.json and trader/trade_plan.json.
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                    <span>Persisted in central SQLite DB + trader/analysis.json & trader/trade_plan.json.</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWorkflowOpen(false);
+                          setActiveNav('fundamental');
+                        }}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded"
+                      >
+                        Open Fundamental Report
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWorkflowOpen(false);
+                          setActiveNav('technical');
+                        }}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded"
+                      >
+                        Open Chart & Order Ticket
+                      </button>
+                    </div>
                   </div>
                 </>
               ) : null}

@@ -1,7 +1,324 @@
 {
-  "generated_at": null,
-  "symbol": null,
-  "technical": null,
-  "fundamental": null,
-  "news": null
+  "generated_at": "2026-11-13T11:02:12.294401+05:30",
+  "analysis_type": "full",
+  "symbol": "MAZDOCK",
+  "company_name": "Mazagon Dock Shipbuilders Limited",
+  "isin": "INE249Z01020",
+  "bse_code": "543237",
+  "exchange": "NSE",
+  "sector": "Industrials",
+  "industry": "Aerospace & Defense",
+  "cap_tier": "Large Cap",
+  "timeframe": "1d",
+  "source": "Yahoo Finance (Unofficial)",
+  "technical": {
+    "available": true,
+    "latest": {
+      "close": 1914.4,
+      "ema9": 1868.6258117730122,
+      "ema21": 1902.0800037959812,
+      "ema50": 2048.223700101485,
+      "ema200": 2309.3364085619924,
+      "rsi14": 47.64246656886351,
+      "macd": -59.735970031329316,
+      "macd_signal": -87.53274597574395,
+      "macd_hist": 27.796775944414634,
+      "bb_upper": 2101.786655162999,
+      "bb_mid": 1873.8399999999983,
+      "bb_lower": 1645.8933448369976,
+      "bb_bandwidth": 24.329361649127026,
+      "atr14": 63.24958888699575,
+      "vwap": 1903.1333333333332,
+      "volume": 241431.0,
+      "vol_sma20": 1054357.3,
+      "volume_ratio": 0.23
+    },
+    "support_resistance": {
+      "supports": [
+        1687.5
+      ],
+      "resistances": [
+        1935.6,
+        2145.0,
+        2546.6
+      ],
+      "pivot": 1906.67
+    },
+    "patterns": [
+      {
+        "name": "Hammer / Pin Bar",
+        "bias": "BULLISH"
+      }
+    ]
+  },
+  "fundamental": {
+    "available": true,
+    "symbol": "MAZDOCK",
+    "sector": "Industrials",
+    "industry": "Aerospace & Defense",
+    "business_summary": "Mazagon Dock Shipbuilders Limited engages in the building and repairing of ships, submarines, vessels, and related engineering products in India and internationally. The company operates in two segments, Shipbuilding, and Submarine and Heavy Engineering. The company offers cargo ships, passenger ships, supply vessels, multipurpose support vessels, water tankers, tugs, dredgers, fishing trawlers, barges, and border outposts. It also provides services, including repairs and refit, designing of ships, know how provider, training, tug support, supply chain management, and self-propeller modular transporter. In addition, it offers offshore patrol vessels, fast patrol vessels, and floating boarder outposts. Further, the company provides AI products, including remotely operated vehicles, AI-enabled phased array ultrasonic testing, and AI-enabled computerized radiography. The company was formerly known as Mazagon Dock Limited and changed its name to Mazagon Dock Shipbuilders Limited in May 2015. Mazagon Dock Shipbuilders Limited was founded in 1774 and is based in Mumbai, India.",
+    "website": "https://mazagondock.in",
+    "currency": "INR",
+    "current_price_inr": 1915.2,
+    "market_cap_cr": 77255.34,
+    "reported_financial_metrics": {
+      "data_type": "Reported Historical Financials",
+      "revenue_growth_yoy_pct": -16.5,
+      "ebitda_growth_yoy_pct": null,
+      "pat_growth_yoy_pct": -54.1,
+      "eps_trailing_inr": 60.8,
+      "eps_growth_pct": 10.22,
+      "operating_margin_pct": 14.07,
+      "ebitda_margin_pct": 14.74,
+      "roe_pct": 23.21,
+      "roce_pct": null,
+      "debt_to_equity": 7.589,
+      "free_cash_flow_cr": -2448.22,
+      "operating_cash_flow_cr": -1314.51,
+      "working_capital_cr": null,
+      "promoter_insider_holding_pct": 81.22,
+      "institutional_holding_pct": 6.09,
+      "pledged_shares_pct": null,
+      "pledged_shares_note": "Verify exact promoter pledge % on Screener.in export or NSE/BSE Shareholding filings."
+    },
+    "valuation": {
+      "pe_trailing": 31.5,
+      "forward_pe": 28.58,
+      "forward_pe_note": "Analyst Consensus Estimate",
+      "pb_ratio": 7.39,
+      "ev_ebitda": 35.04,
+      "peg_ratio": null,
+      "price_to_sales": 6.02
+    },
+    "analyst_estimates_and_models": {
+      "data_type": "Analyst Estimates & Disclosed DCF Model (Distinct from Reported Financials)",
+      "forward_eps_estimate_inr": 67.01,
+      "dcf_intrinsic_valuation": null
+    },
+    "annual_results_cr": [
+      {
+        "period": "2026-03-31",
+        "revenue_cr": 12839.64,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 2583.38
+      },
+      {
+        "period": "2025-03-31",
+        "revenue_cr": 11431.88,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 2413.51
+      },
+      {
+        "period": "2024-03-31",
+        "revenue_cr": 9466.58,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 1936.97
+      },
+      {
+        "period": "2023-03-31",
+        "revenue_cr": 7827.18,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 1119.03
+      }
+    ],
+    "quarterly_results_cr": [
+      {
+        "period": "2026-09-30",
+        "revenue_cr": 2446.09,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 344.12
+      },
+      {
+        "period": "2026-06-30",
+        "revenue_cr": 2770.99,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 509.71
+      },
+      {
+        "period": "2026-03-31",
+        "revenue_cr": 3683.72,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 679.18
+      },
+      {
+        "period": "2025-12-31",
+        "revenue_cr": 3601.09,
+        "ebit_cr": 0.0,
+        "opm_pct": 0.0,
+        "pat_cr": 879.78
+      }
+    ],
+    "classifications": [
+      "Deteriorating Fundamentals"
+    ],
+    "source": "Yahoo Finance (Unofficial)",
+    "is_unofficial": true,
+    "fetched_at_ist": "2026-11-13T11:02:12.282430+05:30",
+    "stock_meta": {
+      "stock_id": "INE249Z01020",
+      "isin": "INE249Z01020",
+      "nse_symbol": "MAZDOCK",
+      "bse_code": "543237",
+      "yahoo_symbol": "MAZDOCK.NS",
+      "company_name": "Mazagon Dock Shipbuilders Limited",
+      "series": "EQ",
+      "sector": "Industrials",
+      "industry": "Aerospace & Defense",
+      "exchange": "NSE",
+      "market_cap_cr": 77255.34,
+      "cap_tier": "Large Cap",
+      "trading_status": "ACTIVE",
+      "screener_url": "https://www.screener.in/company/MAZDOCK/",
+      "aliases_json": "[]",
+      "updated_at": "2026-11-13T11:02:12.272738+05:30",
+      "effective_yahoo_symbol": "MAZDOCK.NS"
+    },
+    "company_name": "Mazagon Dock Shipbuilders Limited",
+    "provenance": {
+      "data_source": "Yahoo Finance (Unofficial)",
+      "reporting_period": "2026-03-31",
+      "last_updated": "2026-11-13T11:02:12.282430+05:30",
+      "statement_scope": "Consolidated / Market Default",
+      "actual_vs_estimated": "Actual Reported Financials (Model DCF & Forward P/E Separated)",
+      "screener_imported": false,
+      "screener_url": "https://www.screener.in/company/MAZDOCK/"
+    },
+    "scores": {
+      "composite_score": 37.0,
+      "business_quality": {
+        "score": 67.0,
+        "evidence": [
+          "ROE 23.2%",
+          "Operating Margin 14.1%"
+        ]
+      },
+      "financial_strength": {
+        "score": 12.0,
+        "evidence": [
+          "Debt/Equity 7.59x",
+          "Operating Cash Flow \u20b9-1,314.5 Cr",
+          "Free Cash Flow \u20b9-2,448.2 Cr"
+        ]
+      },
+      "growth": {
+        "score": 19.0,
+        "evidence": [
+          "YoY Revenue Growth -16.5%",
+          "YoY PAT Growth -54.1%"
+        ]
+      },
+      "valuation": {
+        "score": 50.0,
+        "evidence": [
+          "P/E 31.5x",
+          "P/B 7.39x",
+          "EV/EBITDA 35.0x"
+        ]
+      }
+    },
+    "management_and_governance": "High promoter/insider alignment at 81.2% holding.",
+    "major_risks": [
+      "Balance sheet leverage risk with Debt/Equity at 7.59x.",
+      "Negative operating cash generation requires monitoring working capital cycle.",
+      "Incomplete financial disclosure in current sources (ROCE %, Detailed Screener Balance Sheet)."
+    ],
+    "bullish_factors": [
+      "Tracked in central Bharat Trader AI registry (MAZDOCK); import full Screener.in Excel export for deeper historical catalysts."
+    ],
+    "bearish_factors": [
+      "Elevated leverage (Debt/Equity 7.59x) increases interest burden.",
+      "Negative Operating Cash Flow (\u20b9-1,314.5 Cr).",
+      "Modest revenue growth (-16.5%).",
+      "Earnings contraction (-54.1%)."
+    ],
+    "final_assessment": "Mazagon Dock Shipbuilders Limited (MAZDOCK) scores 37.0/100 composite fundamental strength (Quality 67.0, Strength 12.0, Growth 19.0, Valuation 50.0). Key reported anchors: ROE 23.2%, Operating Margin 14.1%, Debt/Equity 7.59x, Operating Cash Flow \u20b9-1,314.5 Cr, Free Cash Flow \u20b9-2,448.2 Cr, YoY Revenue Growth -16.5%. Partial market feed only (import Screener.in .xlsx/.csv in Screener.in Data Center for 5-10Y multi-statement depth).",
+    "missing_fields": [
+      "ROCE %",
+      "Detailed Screener Balance Sheet"
+    ],
+    "balance_sheet": [],
+    "cash_flow": [],
+    "shareholding": [],
+    "business_notes": {},
+    "business_analysis": {
+      "business_model": "Mazagon Dock Shipbuilders Limited engages in the building and repairing of ships, submarines, vessels, and related engineering products in India and internationally. The company operates in two segments, Shipbuilding, and Submarine and Heavy Engineering. The company offers cargo ships, passenger ships, supply vessels, multipurpose support vessels, water tankers, tugs, dredgers, fishing trawlers, barges, and border outposts. It also provides services, including repairs and refit, designing of ships, know how provider, training, tug support, supply chain management, and self-propeller modular transporter. In addition, it offers offshore patrol vessels, fast patrol vessels, and floating boarder outposts. Further, the company provides AI products, including remotely operated vehicles, AI-enabled phased array ultrasonic testing, and AI-enabled computerized radiography. The company was formerly known as Mazagon Dock Limited and changed its name to Mazagon Dock Shipbuilders Limited in May 2015. Mazagon Dock Shipbuilders Limited was founded in 1774 and is based in Mumbai, India.",
+      "governance_and_ownership": "High promoter/insider alignment at 81.2% holding.",
+      "capital_allocation": "ROCE N/A% \u00b7 ROE 23.21% \u00b7 Debt/Equity 7.589x",
+      "order_book_and_execution_note": "Import Screener.in notes or add Order Book / Execution notes in Screener.in Data Center."
+    },
+    "peer_comparison": []
+  },
+  "news": {
+    "overall_sentiment": "BEARISH",
+    "counts": {
+      "total": 8,
+      "bullish": 0,
+      "bearish": 1,
+      "neutral": 7
+    },
+    "top_articles": [
+      {
+        "title": "Mazagon Dock Shipbuilders Limited (MAZDOCK.NS) Stock Price, News, Quote & History - Yahoo! Finance Canada",
+        "summary": "",
+        "source": "Yahoo! Finance Canada",
+        "published_at": "Sun, 13 Dec 2020 00:56:15 GMT",
+        "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE1nTHVNdEdXTlNNM1VwVHNUNjU3UmR6VkdqMVBxR21GSl9JcTI0NnRlb1pDNEU2QlMteDlrUnRQOGNfY3RIM3p3MHpkN0tleXBkcURYMzZvYVo2dw?oc=5",
+        "symbol": "MAZDOCK",
+        "event_category": "Corporate Announcement",
+        "sentiment": "NEUTRAL",
+        "impact_explanation": "Informational corporate announcement update; monitor price reaction at key support/resistance before acting."
+      },
+      {
+        "title": "MAZDOCK Stock Price and Chart \u2014 NSE:MAZDOCK - TradingView",
+        "summary": "",
+        "source": "TradingView",
+        "published_at": "Tue, 13 Oct 2020 19:26:59 GMT",
+        "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE14dFB0TXYzZld0dEZJYUp0SWVVendiOUxsdzhoQU03WS1XdTFramV5RDBqMWlrMFlHV2d5azRNY2xJRnVQXzJ6aGxMbU8tWlFkRUI0MmFuQUxjQUdR?oc=5",
+        "symbol": "MAZDOCK",
+        "event_category": "Corporate Announcement",
+        "sentiment": "NEUTRAL",
+        "impact_explanation": "Informational corporate announcement update; monitor price reaction at key support/resistance before acting."
+      },
+      {
+        "title": "Mazagon Dock Shipbuilders shares drop most in over 4 months; here's why - Upstox",
+        "summary": "",
+        "source": "Upstox",
+        "published_at": "Thu, 29 May 2025 07:00:00 GMT",
+        "url": "https://news.google.com/rss/articles/CBMi6wFBVV95cUxNbjdLRTZIRFdlaTNKRzQycFVzZGIyRzZzSmREdnEyMEZNYTlydjhZb0xJY1BfZ0Jmekt0UWxEaDZuYzRzTWFGcFdCb0cwYVoweG5iQUFlWmUyeHRZRDZ5X2V4Wk9ZM3d5ODd0SmhxM1NHazNsYjdiV1dZVGxhWE5qUm5SaVpHM1FxZDEya3RkOGJmRzEzbllxb1M4OGhpZVVHd3dPa0J0X180a2NfX3RqbUJTZ21pQkwycWJOY2ppWGhIaXJpYnhzQTExSlkxSGZxX3pJUnFPVm1wRVVteVBzTUhmZVJHdmdCNTBv?oc=5",
+        "symbol": "MAZDOCK",
+        "event_category": "Corporate Announcement",
+        "sentiment": "BEARISH",
+        "impact_explanation": "Negative risk factor (drop); could trigger supply pressure or near-term volatility."
+      },
+      {
+        "title": "Mazagon Dock Shipbuilders Ltd. Share Price Today | Mazagon Dock Live NSE/BSE - Value Research",
+        "summary": "",
+        "source": "Value Research",
+        "published_at": "Thu, 24 Mar 2022 20:36:49 GMT",
+        "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxOb2RyOThXWlh1eEtwSnVXdnN2eDIwTGZnQ3JpVXpCSjZWUDhyY3FpYldvUkVsZXU3RW0xYTlnbmFxV1VLcXI3anc4YVJ4QkdNQWpkeWpDMWF3Vm56LVN2LVpOSk14NTMwMzlOdi14X3RtMjNvaGlhSWx0WHBBX2J1NXI3LTZvU2M?oc=5",
+        "symbol": "MAZDOCK",
+        "event_category": "Corporate Announcement",
+        "sentiment": "NEUTRAL",
+        "impact_explanation": "Informational corporate announcement update; monitor price reaction at key support/resistance before acting."
+      },
+      {
+        "title": "State or government account for 81% of Mazagon Dock Shipbuilders Limited's (NSE:MAZDOCK) ownership, while individual investors account for 11% - Simply Wall St",
+        "summary": "",
+        "source": "Simply Wall St",
+        "published_at": "Sun, 18 Jan 2026 08:00:00 GMT",
+        "url": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxOR0lkZjlRejkzS3dsTnp6QlhLdVFTb2JGcENoc2ZTYlVlbHBtYTRoNTNNbG13a0ljRllnbG9sQTNmQnhBMjhNc0Y1UzdyMkI3d3didVNSeDFFV0l5cFQ0LUdyTnYwWC1QRnZBREp2N2xza250STl4VVN6d09SbC1BT2lXMjlFczBIbmNnNk1WeVNPdzVJdzFYMjFqR3dDTHNIU0pIY2lJc3gxbm9qX1JUdkNoc0FvNHZlQUZ5aHo1MXlveW1LYzR0M29VRW4xOUNrTlBwM1lmQUNlTkkxMnROYUVpUHByTmhhNk1vZ9IB8gFBVV95cUxQek5SQzlyRmN2T2NSM1pnNnNzV2dldmhna1NtcW9vNGNLOVNMU0hLY0xBNEJFNGlYdG1iNDlzaWJNWWoyLWtIYVo4U1B3aUU4MUFkOERNS3lzellJcnY4RjhtbTdaX3pVeXJnclNnazk5QnhwSGZvR2JGSmUwT0h6NW80aW1vdTYtaHhSMkYwby0yQkV6UHNpVGJVMUdFRmxaMEVuQm5SbUxmSDNMaWJ5NnBmd3BIUk5BS1JvMFRxUFcyTWpMYlpMN29uelVLLTZVRlgwbDd4NHhKTm1lNWVHV2dFTzlhY3pjZ3hxWjdERnpMUQ?oc=5",
+        "symbol": "MAZDOCK",
+        "event_category": "Corporate Announcement",
+        "sentiment": "NEUTRAL",
+        "impact_explanation": "Informational corporate announcement update; monitor price reaction at key support/resistance before acting."
+      }
+    ]
+  }
 }
